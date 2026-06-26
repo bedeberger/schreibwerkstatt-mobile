@@ -21,6 +21,10 @@
     <string name="settings_signout">Dieses Gerät abmelden</string>
     <string name="settings_stt_status">Diktat (STT)</string>
 
+    <!-- Tree (Kapitel-/Seitenbaum) -->
+    <string name="tree_page_updated">Zuletzt geändert: %1$s</string>
+    <string name="tree_page_updated_unknown">Noch nicht synchronisiert</string>
+
     <!-- Editor / Dictation -->
     <string name="editor_dictate">Diktieren</string>
     <string name="editor_stop">Stopp</string>

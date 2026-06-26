@@ -26,12 +26,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.schreibwerkstatt.mobile.R
 import ch.schreibwerkstatt.mobile.locator
 import ch.schreibwerkstatt.mobile.ui.components.SyncStatusBar
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,18 +92,38 @@ fun TreeScreen(
                             },
                             modifier = Modifier.padding(start = indent),
                         )
-                        is TreeRow.Page -> ListItem(
-                            headlineContent = { Text(row.name) },
-                            leadingContent = {
-                                Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null)
-                            },
-                            modifier = Modifier
-                                .padding(start = indent)
-                                .clickable { onOpenPage(row.id, row.name) },
-                        )
+                        is TreeRow.Page -> {
+                            val updated = formatUpdatedAt(state.pageUpdatedAt[row.id])
+                            ListItem(
+                                headlineContent = { Text(row.name) },
+                                supportingContent = {
+                                    Text(
+                                        updated?.let { stringResource(R.string.tree_page_updated, it) }
+                                            ?: stringResource(R.string.tree_page_updated_unknown),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
+                                leadingContent = {
+                                    Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null)
+                                },
+                                modifier = Modifier
+                                    .padding(start = indent)
+                                    .clickable { onOpenPage(row.id, row.name) },
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
+
+/** Lokalisiertes Anzeigedatum aus dem ISO-8601-`updated_at` des Servers; null = unbekannt/unparsebar. */
+private val updatedAtFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
+        .withLocale(Locale.getDefault())
+        .withZone(ZoneId.systemDefault())
+
+private fun formatUpdatedAt(iso: String?): String? =
+    iso?.let { runCatching { updatedAtFormatter.format(Instant.parse(it)) }.getOrNull() }

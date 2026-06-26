@@ -25,6 +25,8 @@ sealed interface TreeRow {
 data class TreeUiState(
     val bookId: Long,
     val rows: List<TreeRow> = emptyList(),
+    /** Server-`updated_at` (ISO-8601) je Seite aus dem lokalen Cache; Quelle für „zuletzt geändert". */
+    val pageUpdatedAt: Map<Long, String?> = emptyMap(),
     val loading: Boolean = true,
     val error: String? = null,
 )
@@ -42,6 +44,15 @@ class TreeViewModel(
         load()
         // Im Hintergrund Offline-Cache der Seiten auffrischen (Delta-Pull).
         viewModelScope.launch { repo.syncBook(bookId) }
+        // „Zuletzt geändert" je Seite reaktiv aus dem Room-Cache spiegeln
+        // (wird vom Delta-Pull aktualisiert).
+        viewModelScope.launch {
+            repo.observePages(bookId).collect { pages ->
+                _state.value = _state.value.copy(
+                    pageUpdatedAt = pages.associate { it.id to it.updatedAt }
+                )
+            }
+        }
         // Bei (wiederhergestellter) Verbindung erneut pullen + Struktur neu laden.
         // drop(1): den Startwert überspringen (init macht das schon oben).
         viewModelScope.launch {
