@@ -24,4 +24,16 @@
     <!-- Editor / Dictation -->
     <string name="editor_dictate">Diktieren</string>
     <string name="editor_stop">Stopp</string>
+    <string name="editor_mic_denied">Mikrofon-Berechtigung fehlt. Bitte in den App-Einstellungen erlauben, um zu diktieren.</string>
+
+    <!-- Sync-Status (Offline-/Queue-Banner) -->
+    <string name="sync_offline">Offline – Änderungen werden lokal gespeichert</string>
+    <plurals name="sync_pending_offline">
+        <item quantity="one">Offline – %d Änderung wartet auf Synchronisierung</item>
+        <item quantity="other">Offline – %d Änderungen warten auf Synchronisierung</item>
+    </plurals>
+    <plurals name="sync_pending_online">
+        <item quantity="one">%d Änderung wird synchronisiert…</item>
+        <item quantity="other">%d Änderungen werden synchronisiert…</item>
+    </plurals>
 </resources>

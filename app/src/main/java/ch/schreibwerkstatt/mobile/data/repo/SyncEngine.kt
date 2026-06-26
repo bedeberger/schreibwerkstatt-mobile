@@ -70,12 +70,12 @@ class SyncEngine(
      * übersetzt. Liefert Anzahl erfolgreich bestätigter Writes.
      */
     suspend fun flushPending(
-        putOne: suspend (localId: Long, pageId: Long, bookId: Long, html: String, deviceId: String) -> SaveResult,
+        putOne: suspend (localId: Long, pageId: Long, bookId: Long, html: String, deviceId: String, baseUpdatedAt: String?) -> SaveResult,
     ): Result<Int> = runCatching {
         val pending = db.pendingWriteDao().byStatus(PendingWriteEntity.STATUS_PENDING)
         var ok = 0
         for (w in pending) {
-            when (putOne(w.localId, w.pageId, w.bookId, w.html, w.deviceId)) {
+            when (putOne(w.localId, w.pageId, w.bookId, w.html, w.deviceId, w.baseUpdatedAt)) {
                 is SaveResult.Saved -> ok++
                 // Queued/Conflict/Locked: Status wurde in flushOne gesetzt; nicht abbrechen,
                 // damit andere Seiten trotzdem durchlaufen.

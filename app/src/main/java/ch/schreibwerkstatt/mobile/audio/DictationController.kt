@@ -16,9 +16,12 @@ import java.io.File
  * Diktat-Aufnahme (MediaRecorder → AAC/MP4) + Transkription über den STT-Proxy.
  *
  * Aufnahme als `audio/mp4` (AAC) — in der Server-Whitelist und ohne Multipart
- * direkt als Roh-Bytes POSTbar. Segment-Grösse < 5 MB (Server-Limit). Für lange
- * Diktate ruft die UI [stopAndTranscribe] segmentweise auf (v1: Push-to-Record
- * mit maxSegment-Cap; VAD/Stille-Schnitt ist eine spätere Ausbaustufe).
+ * direkt als Roh-Bytes POSTbar. Segment-Grösse < 5 MB (Server-Limit).
+ *
+ * Stille-Erkennung (einfaches VAD): [currentAmplitude] liefert die Spitzen-
+ * amplitude seit dem letzten Aufruf (MediaRecorder.getMaxAmplitude). Das
+ * [EditorViewModel] pollt sie und beendet das Segment automatisch nach einer
+ * Sprechpause bzw. an einer Maximaldauer (Schutz vor dem 5-MB-Limit).
  */
 class DictationController(
     private val context: Context,
@@ -31,6 +34,13 @@ class DictationController(
     val isRecording: Boolean get() = recorder != null
 
     private val mime = "audio/mp4"
+
+    /**
+     * Spitzen-Amplitude (0..32767) seit dem letzten Aufruf. 0, wenn keine
+     * Aufnahme läuft. Grundlage der Stille-Erkennung im VM.
+     */
+    fun currentAmplitude(): Int =
+        recorder?.let { runCatching { it.maxAmplitude }.getOrDefault(0) } ?: 0
 
     fun startRecording(): Result<Unit> = runCatching {
         check(recorder == null) { "Aufnahme läuft bereits" }

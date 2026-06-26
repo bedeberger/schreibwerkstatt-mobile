@@ -9,9 +9,11 @@ import ch.schreibwerkstatt.mobile.ServiceLocator
 import ch.schreibwerkstatt.mobile.data.net.dto.ChapterNodeDto
 import ch.schreibwerkstatt.mobile.data.net.dto.TreeDto
 import ch.schreibwerkstatt.mobile.data.repo.ContentRepository
+import ch.schreibwerkstatt.mobile.data.repo.SyncCoordinator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 sealed interface TreeRow {
@@ -29,6 +31,7 @@ data class TreeUiState(
 
 class TreeViewModel(
     private val repo: ContentRepository,
+    private val coordinator: SyncCoordinator,
     private val bookId: Long,
 ) : ViewModel() {
 
@@ -39,6 +42,16 @@ class TreeViewModel(
         load()
         // Im Hintergrund Offline-Cache der Seiten auffrischen (Delta-Pull).
         viewModelScope.launch { repo.syncBook(bookId) }
+        // Bei (wiederhergestellter) Verbindung erneut pullen + Struktur neu laden.
+        // drop(1): den Startwert überspringen (init macht das schon oben).
+        viewModelScope.launch {
+            coordinator.online.drop(1).collect { isOnline ->
+                if (isOnline) {
+                    repo.syncBook(bookId)
+                    load()
+                }
+            }
+        }
     }
 
     fun load() {
@@ -65,7 +78,7 @@ class TreeViewModel(
 
     companion object {
         fun factory(locator: ServiceLocator, bookId: Long): ViewModelProvider.Factory = viewModelFactory {
-            initializer { TreeViewModel(locator.repository, bookId) }
+            initializer { TreeViewModel(locator.repository, locator.syncCoordinator, bookId) }
         }
     }
 }

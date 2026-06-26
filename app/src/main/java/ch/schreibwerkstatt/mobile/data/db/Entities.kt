@@ -53,6 +53,13 @@ data class PendingWriteEntity(
     val html: String,
     val deviceId: String,
     val createdAt: Long,
+    /**
+     * Server-`updated_at`-Snapshot, auf dem dieser Edit basierte (aus der Page-Row
+     * beim Queuen). Geht als `expected_updated_at` an den Server, damit ein
+     * verzögerter Offline-Flush einen zwischenzeitlichen Fremd-Save als 409 erkennt
+     * statt blind zu überschreiben. null = keine bekannte Basis → kein Guard.
+     */
+    val baseUpdatedAt: String? = null,
     val status: String = STATUS_PENDING,
     /** Letzte Fehlermeldung / Konfliktinfo (z.B. server_editor_name). */
     val note: String? = null,

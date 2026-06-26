@@ -77,6 +77,11 @@ class ContentRepository(
      */
     suspend fun savePage(pageId: Long, bookId: Long, html: String): SaveResult {
         val deviceId = settings.deviceId()
+        // Basis-Stand VOR der lokalen Mutation festhalten: updateHtml lässt updatedAt
+        // unberührt, hier steht also der zuletzt bestätigte Server-Stand (dirty-Seiten
+        // werden vom Sync-Pull nie überschrieben). Dieser Snapshot geht als
+        // expected_updated_at mit, damit der Server einen Fremd-Save als 409 erkennt.
+        val baseUpdatedAt = db.pageDao().byId(pageId)?.updatedAt
         // 1) Lokal persistieren (dirty) + Queue konsolidieren.
         db.pageDao().updateHtml(pageId, html, dirty = true)
         db.pendingWriteDao().deletePendingForPage(pageId)
@@ -87,10 +92,11 @@ class ContentRepository(
                 html = html,
                 deviceId = deviceId,
                 createdAt = nowMillis(),
+                baseUpdatedAt = baseUpdatedAt,
             )
         )
         // 2) Online-Versuch.
-        return flushOne(localId, pageId, bookId, html, deviceId)
+        return flushOne(localId, pageId, bookId, html, deviceId, baseUpdatedAt)
     }
 
     /** Einzelnen Pending-Write gegen den Server schicken. */
@@ -100,9 +106,13 @@ class ContentRepository(
         bookId: Long,
         html: String,
         deviceId: String,
+        baseUpdatedAt: String?,
     ): SaveResult {
         val resp: Response<ch.schreibwerkstatt.mobile.data.net.dto.PageDto> = try {
-            net.content(baseUrl()).savePage(pageId, SavePageRequest(html = html, device_id = deviceId))
+            net.content(baseUrl()).savePage(
+                pageId,
+                SavePageRequest(html = html, device_id = deviceId, expected_updated_at = baseUpdatedAt),
+            )
         } catch (e: Exception) {
             return SaveResult.Queued   // offline → bleibt in der Queue
         }

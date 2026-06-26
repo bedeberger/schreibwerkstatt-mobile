@@ -54,6 +54,12 @@ data class SavePageRequest(
     val html: String,
     val device_id: String,
     val source: String = "main",
+    /**
+     * Optimistic-Concurrency-Guard: zuletzt bekannter Server-`updated_at`, auf dem
+     * dieser Edit basiert. Stimmt der DB-Stand nicht überein → Server liefert 409
+     * PAGE_CONFLICT statt last-write-wins. null = kein Guard (z.B. unbekannte Basis).
+     */
+    val expected_updated_at: String? = null,
 )
 
 /** 409 PAGE_CONFLICT-Body. */

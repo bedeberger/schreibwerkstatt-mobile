@@ -2,6 +2,7 @@ package ch.schreibwerkstatt.mobile.ui.tree
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -21,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -29,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.schreibwerkstatt.mobile.locator
+import ch.schreibwerkstatt.mobile.ui.components.SyncStatusBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,19 +42,25 @@ fun TreeScreen(
     onOpenPage: (pageId: Long, pageName: String) -> Unit,
 ) {
     val context = LocalContext.current
+    val coordinator = remember(context) { context.locator.syncCoordinator }
     val vm: TreeViewModel = viewModel(factory = TreeViewModel.factory(context.locator, bookId))
     val state by vm.state.collectAsStateWithLifecycle()
+    val online by coordinator.online.collectAsStateWithLifecycle()
+    val pendingCount by coordinator.pendingCount.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(bookTitle) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
-                    }
-                },
-            )
+            Column {
+                TopAppBar(
+                    title = { Text(bookTitle) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                        }
+                    },
+                )
+                SyncStatusBar(online = online, pendingCount = pendingCount)
+            }
         },
     ) { padding ->
         when {

@@ -7,6 +7,20 @@
   <style>
     html, body { margin: 0; height: 100%; background: var(--color-bg, #fff); }
     #mount { height: 100%; }
+    /* Kein horizontaler Überlauf an der Wurzel: sonst kann ein zu breites
+       Kind (langes Wort/Link, Tabelle) den Inhalt unter den Viewport-Rand
+       schieben, wo das letzte Zeichen abgeschnitten wird. */
+    html, body, #mount { overflow-x: hidden; max-width: 100%; }
+    /* Defensiver Umbruch unabhängig von der (per OTA geladenen) Bundle-
+       Version: lange Tokens ohne Whitespace brechen im Editor-Container statt
+       horizontal zu overflowen. `!important`, weil das Bundle-CSS nach diesem
+       <style> injiziert wird. `pre`/`code` behalten ihren `white-space` —
+       wir setzen nur overflow-wrap, nicht white-space. */
+    .focus-editor__content,
+    .focus-editor__content * {
+      overflow-wrap: anywhere !important;
+      word-break: normal;
+    }
     .sw-boot-error {
       font: 15px/1.5 system-ui, sans-serif; color: #b00020; padding: 24px;
     }

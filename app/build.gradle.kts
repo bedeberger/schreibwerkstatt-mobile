@@ -86,6 +86,12 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    testOptions {
+        unitTests {
+            // Robolectric braucht Zugriff auf die kompilierten Android-Ressourcen.
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 dependencies {
@@ -119,4 +125,10 @@ dependencies {
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.webkit)
     implementation(libs.androidx.browser)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.room.testing)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

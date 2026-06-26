@@ -2,6 +2,7 @@ package ch.schreibwerkstatt.mobile.ui.editor
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.pm.PackageManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -38,11 +39,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.webkit.WebViewAssetLoader
+import ch.schreibwerkstatt.mobile.R
 import ch.schreibwerkstatt.mobile.locator
 import org.json.JSONObject
 
@@ -66,8 +70,10 @@ fun EditorScreen(
     // evaluateJavascript-Helfer (UI-Thread).
     val evalJs: (String) -> Unit = { js -> webViewRef.value?.post { webViewRef.value?.evaluateJavascript(js, null) } }
 
+    val micDeniedMsg = stringResource(R.string.editor_mic_denied)
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) vm.toggleDictation { text -> insertText(evalJs, text) }
+        else vm.notify(micDeniedMsg)
     }
 
     // Snackbar-Events.
@@ -98,8 +104,13 @@ fun EditorScreen(
             if (state.sttEnabled) {
                 FloatingActionButton(onClick = {
                     if (state.transcribing) return@FloatingActionButton
-                    // Permission prüfen → toggeln.
-                    micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                    // Bereits erteilt → direkt toggeln (start/stop). Sonst Berechtigung
+                    // anfragen; der Launcher-Callback startet bei Erfolg, sonst Hinweis.
+                    val granted = ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.RECORD_AUDIO
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (granted) vm.toggleDictation { text -> insertText(evalJs, text) }
+                    else micPermission.launch(Manifest.permission.RECORD_AUDIO)
                 }) {
                     when {
                         state.transcribing -> CircularProgressIndicator(strokeWidth = 2.dp)

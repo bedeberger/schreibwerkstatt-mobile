@@ -22,6 +22,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -32,6 +33,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.schreibwerkstatt.mobile.R
 import ch.schreibwerkstatt.mobile.data.db.BookEntity
 import ch.schreibwerkstatt.mobile.locator
+import ch.schreibwerkstatt.mobile.ui.components.SyncStatusBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,25 +42,31 @@ fun BooksScreen(
     onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
+    val coordinator = remember(context) { context.locator.syncCoordinator }
     val vm: BooksViewModel = viewModel(factory = BooksViewModel.factory(context.locator))
     val books by vm.books.collectAsStateWithLifecycle()
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val online by coordinator.online.collectAsStateWithLifecycle()
+    val pendingCount by coordinator.pendingCount.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.books_title)) },
-                actions = {
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings_title))
-                    }
-                },
-            )
+            Column {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.books_title)) },
+                    actions = {
+                        IconButton(onClick = onOpenSettings) {
+                            Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings_title))
+                        }
+                    },
+                )
+                SyncStatusBar(online = online, pendingCount = pendingCount)
+            }
         },
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = refreshing,
-            onRefresh = vm::refresh,
+            onRefresh = { vm.refresh(); coordinator.flushNow() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
