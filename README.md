@@ -42,13 +42,14 @@ dem Server.
 
 ## Server-Integration (verifiziert gegen das Mutterprojekt)
 
-- **Auth:** Device-Token `swd_*`. Pairing über die Web-Login-Session: die App
-  öffnet `<server>/` in einer WebView, der Nutzer meldet sich per Google-OIDC an
-  und tippt „Gerät koppeln". Ein injiziertes `fetch('/me/device-tokens',
-  {credentials:'include'})` zieht den Token aus der Session; der `plain_token`
-  wird verschlüsselt abgelegt (`EncryptedSharedPreferences`). Danach: Header
-  `Authorization: Bearer swd_…` auf allen Requests. 401 → Token verworfen →
-  zurück zum Pairing.
+- **Auth:** Device-Token `swd_*`. Pairing ist **manuelle Token-Eingabe** (wie der
+  macOS-Client): Der Nutzer erzeugt das Device-Token vorab in der Web-UI
+  („Einstellungen → Geräte"), trägt im `PairingScreen` Server-Adresse + Token ein,
+  und die App verifiziert es über `GET /config` (hinter dem Auth-Guard). Erst bei
+  Erfolg wird der Token verschlüsselt abgelegt (`EncryptedSharedPreferences`).
+  Kein WebView/OIDC-Flow (Google-OIDC im WebView ist unzuverlässig,
+  `disallowed_useragent`). Danach: Header `Authorization: Bearer swd_…` auf allen
+  Requests. 401 → Token verworfen → zurück zum Pairing.
 - **Editor-Bridge:** `host.html` lädt `js/editor/focus/standalone.js` und ruft
   `mountStandaloneFocus({ mount, bridge })`. Die Bridge bedient den verifizierten
   Vertrag: `loadPage()` (aktuell gewählte Seite, **kein** pageId-Arg) und
@@ -68,26 +69,16 @@ dem Server.
 Voraussetzungen: Android Studio (Ladybug+) oder Android SDK 35 + JDK 17.
 
 ```bash
-# Wrapper-JAR ggf. einmalig erzeugen (nicht eingecheckt):
-gradle wrapper --gradle-version 8.11.1
-# danach:
 ./gradlew assembleDebug
 ```
 
-> **Hinweis:** `gradle/wrapper/gradle-wrapper.jar` ist nicht enthalten. Android
-> Studio erzeugt ihn beim ersten Gradle-Sync automatisch; alternativ obiger
-> `gradle wrapper`-Aufruf (benötigt ein lokal installiertes Gradle).
+Der Gradle-Wrapper (`gradle/wrapper/gradle-wrapper.jar`) ist eingecheckt — kein
+separates Gradle nötig. `local.properties` (mit `sdk.dir`) wird von Android Studio
+beim ersten Sync erzeugt bzw. manuell angelegt; sie ist nicht eingecheckt.
 
-Beim ersten Start: Server-URL eingeben → koppeln. Self-hosted-Server ohne TLS
+Beim ersten Start: Server-URL + vorab am Server erzeugtes Device-Token (`swd_…`)
+eingeben → koppeln. Self-hosted-Server ohne TLS
 sind via `network_security_config` (Cleartext erlaubt) erreichbar — für
 produktive Deployments HTTPS verwenden.
 
-## Stand / v1
 
-Enthalten: Pairing, Buchliste, Kapitel-/Seitenbaum, Editor-WebView (OTA-Bundle),
-Diktat, Offline-Cache + Delta-Sync + Pending-Writes mit 409/423-Handling,
-Settings (Server-URL, STT-Status, Gerät abmelden).
-
-Bewusst nicht in v1: Buchorganizer/DnD, KI-Analysen/Jobs, Chat, Export, eigener
-Editor-Nachbau. Diktat-Segmentierung ist v1-einfach (Push-to-Record mit
-maxSegment-Cap); VAD/Stille-Schnitt ist eine spätere Ausbaustufe.
