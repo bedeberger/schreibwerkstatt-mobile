@@ -29,7 +29,7 @@ class BundleManager(
     tokenStore: TokenStore,
 ) {
     private val http: OkHttpClient = OkHttpClient.Builder()
-        .addInterceptor(AuthInterceptor(tokenStore))
+        .addInterceptor(AuthInterceptor(tokenStore::token, tokenStore::clear))
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .build()

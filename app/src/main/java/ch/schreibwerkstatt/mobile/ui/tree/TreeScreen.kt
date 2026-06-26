@@ -89,7 +89,7 @@ fun TreeScreen(
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Icon(
                         Icons.Filled.ErrorOutline,

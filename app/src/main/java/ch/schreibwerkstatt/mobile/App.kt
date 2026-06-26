@@ -5,6 +5,7 @@ import android.content.Context
 import ch.schreibwerkstatt.mobile.audio.DictationController
 import ch.schreibwerkstatt.mobile.bundle.BundleManager
 import ch.schreibwerkstatt.mobile.data.db.AppDatabase
+import ch.schreibwerkstatt.mobile.data.net.ClientInfo
 import ch.schreibwerkstatt.mobile.data.net.ConnectivityObserver
 import ch.schreibwerkstatt.mobile.data.net.NetworkClient
 import ch.schreibwerkstatt.mobile.data.prefs.SettingsStore
@@ -47,6 +48,8 @@ class App : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Gerätename einmal pro Prozess ermitteln (für die X-Client-Device-Header).
+        ClientInfo.init(this)
         locator = ServiceLocator(this)
         // Auto-Flush der Pending-Write-Queue bei (wiederhergestellter) Verbindung.
         locator.syncCoordinator.start()

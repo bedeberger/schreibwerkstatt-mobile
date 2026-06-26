@@ -17,7 +17,11 @@ import kotlinx.coroutines.flow.StateFlow
  */
 class TokenStore(context: Context) {
 
-    private val prefs: SharedPreferences = run {
+    // Lazy: EncryptedSharedPreferences greift auf den Android-Keystore (Tink) zu.
+    // Erst beim ersten Token-Zugriff initialisieren — so bleibt die Konstruktion
+    // krypto-frei (in Tests ohne Keystore konstruierbar, solange kein Token
+    // gelesen/geschrieben wird).
+    private val prefs: SharedPreferences by lazy {
         val masterKey = MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
@@ -30,9 +34,9 @@ class TokenStore(context: Context) {
         )
     }
 
-    private val _isPaired = MutableStateFlow(prefs.getString(KEY_TOKEN, null) != null)
+    private val _isPaired by lazy { MutableStateFlow(prefs.getString(KEY_TOKEN, null) != null) }
     /** Reaktiv: true sobald ein Token vorliegt. Treibt die Start-Navigation. */
-    val isPaired: StateFlow<Boolean> = _isPaired
+    val isPaired: StateFlow<Boolean> get() = _isPaired
 
     fun token(): String? = prefs.getString(KEY_TOKEN, null)
 

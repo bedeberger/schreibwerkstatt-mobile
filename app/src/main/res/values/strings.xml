@@ -19,6 +19,7 @@
     <string name="books_title">Bücher</string>
     <string name="books_empty">Keine Bücher gefunden.</string>
     <string name="books_empty_hint">Zum Aktualisieren nach unten ziehen.</string>
+    <string name="books_load_error">Bücher konnten nicht geladen werden: %1$s</string>
 
     <!-- Settings -->
     <string name="settings_title">Einstellungen</string>

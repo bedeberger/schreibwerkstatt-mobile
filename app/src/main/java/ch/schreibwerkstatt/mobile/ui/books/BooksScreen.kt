@@ -19,11 +19,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -53,10 +56,21 @@ fun BooksScreen(
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
     val online by coordinator.online.collectAsStateWithLifecycle()
     val pendingCount by coordinator.pendingCount.collectAsStateWithLifecycle()
+    val error by vm.error.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val loadErrorTemplate = stringResource(R.string.books_load_error)
+    LaunchedEffect(error) {
+        error?.let {
+            snackbarHostState.showSnackbar(loadErrorTemplate.format(it))
+            vm.clearError()
+        }
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
                 TopAppBar(
@@ -109,7 +123,9 @@ fun BooksScreen(
                     items(books, key = { it.id }) { book ->
                         ListItem(
                             headlineContent = { Text(book.name) },
-                            supportingContent = book.role?.let { { Text(it) } },
+                            supportingContent = book.role
+                                ?.takeIf { it != "owner" }
+                                ?.let { { Text(it) } },
                             leadingContent = {
                                 Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null)
                             },

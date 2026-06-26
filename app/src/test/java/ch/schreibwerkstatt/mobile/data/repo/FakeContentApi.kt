@@ -1,0 +1,71 @@
+package ch.schreibwerkstatt.mobile.data.repo
+
+import ch.schreibwerkstatt.mobile.data.net.ContentApi
+import ch.schreibwerkstatt.mobile.data.net.DevicePingRequest
+import ch.schreibwerkstatt.mobile.data.net.NetworkClient
+import ch.schreibwerkstatt.mobile.data.net.dto.BookDto
+import ch.schreibwerkstatt.mobile.data.net.dto.PageDto
+import ch.schreibwerkstatt.mobile.data.net.dto.SavePageRequest
+import ch.schreibwerkstatt.mobile.data.net.dto.SyncResponse
+import ch.schreibwerkstatt.mobile.data.net.dto.TreeDto
+import ch.schreibwerkstatt.mobile.data.prefs.TokenStore
+import android.content.Context
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
+import retrofit2.Response
+
+/**
+ * Programmierbarer [ContentApi]-Fake für SyncEngine-/Repository-Tests. Ersetzt die
+ * Retrofit-gebaute API, sodass Server-Antworten (inkl. 409/423) deterministisch
+ * gesteuert werden — ohne Netzwerk und ohne den verschlüsselten TokenStore.
+ */
+class FakeContentApi : ContentApi {
+
+    /** Sequenz von Sync-Antworten (eine pro Seitenaufruf der Pull-Schleife). */
+    val syncQueue: ArrayDeque<SyncResponse> = ArrayDeque()
+    var syncCalls: Int = 0; private set
+    val sinceArgs: MutableList<String?> = mutableListOf()
+    val sinceIdArgs: MutableList<Long?> = mutableListOf()
+
+    /** Antwort auf savePage; per Test gesetzt. */
+    var savePageResponder: (SavePageRequest) -> Response<PageDto> = { Response.success(PageDto(id = 0)) }
+    var lastSaveRequest: SavePageRequest? = null; private set
+
+    /** Antwort auf page() (z.B. für Konfliktauflösung). */
+    var pageResponder: (Long) -> PageDto = { PageDto(id = it) }
+
+    override suspend fun books(): List<BookDto> = emptyList()
+
+    override suspend fun tree(bookId: Long): TreeDto = throw NotImplementedError()
+
+    override suspend fun sync(bookId: Long, since: String?, sinceId: Long?, limit: Int): SyncResponse {
+        syncCalls++
+        sinceArgs += since
+        sinceIdArgs += sinceId
+        return syncQueue.removeFirstOrNull() ?: SyncResponse(now = "now", pages = emptyList(), has_more = false)
+    }
+
+    override suspend fun page(pageId: Long): PageDto = pageResponder(pageId)
+
+    override suspend fun savePage(pageId: Long, body: SavePageRequest): Response<PageDto> {
+        lastSaveRequest = body
+        return savePageResponder(body)
+    }
+
+    override suspend fun devicePing(bookId: Long, body: DevicePingRequest): Response<Unit> =
+        Response.success(Unit)
+
+    companion object {
+        private val JSON = "application/json".toMediaType()
+
+        /** Baut eine Retrofit-Fehlerantwort mit JSON-Body (für 409/423/500). */
+        fun <T> error(code: Int, json: String): Response<T> =
+            Response.error(code, json.toResponseBody(JSON))
+    }
+}
+
+/** NetworkClient, der [content] auf den übergebenen Fake umbiegt. */
+class FakeNetworkClient(context: Context, private val api: ContentApi) :
+    NetworkClient(TokenStore(context), debug = false) {
+    override fun content(baseUrl: String): ContentApi = api
+}

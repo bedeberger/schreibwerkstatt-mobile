@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit
  * Pairing (Cookie-Session) läuft NICHT hierüber, sondern im WebView via
  * injiziertem fetch (siehe PairingScreen).
  */
-class NetworkClient(
+open class NetworkClient(
     private val tokenStore: TokenStore,
     private val debug: Boolean,
 ) {
@@ -35,7 +35,7 @@ class NetworkClient(
 
     private fun okHttp(): OkHttpClient {
         val builder = OkHttpClient.Builder()
-            .addInterceptor(AuthInterceptor(tokenStore))
+            .addInterceptor(AuthInterceptor(tokenStore::token, tokenStore::clear))
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(45, TimeUnit.SECONDS)   // STT-Cold-Start grosszügig
             .writeTimeout(45, TimeUnit.SECONDS)
@@ -64,9 +64,11 @@ class NetworkClient(
 
     val jsonParser: Json get() = json
 
-    fun content(baseUrl: String): ContentApi = retrofitFor(baseUrl).create(ContentApi::class.java)
-    fun stt(baseUrl: String): SttApi = retrofitFor(baseUrl).create(SttApi::class.java)
-    fun config(baseUrl: String): ConfigApi = retrofitFor(baseUrl).create(ConfigApi::class.java)
+    // open: Tests überschreiben diese Factories, um die Retrofit-APIs durch Fakes
+    // zu ersetzen (siehe SyncEngineTest / ContentRepositorySaveTest).
+    open fun content(baseUrl: String): ContentApi = retrofitFor(baseUrl).create(ContentApi::class.java)
+    open fun stt(baseUrl: String): SttApi = retrofitFor(baseUrl).create(SttApi::class.java)
+    open fun config(baseUrl: String): ConfigApi = retrofitFor(baseUrl).create(ConfigApi::class.java)
 
     /**
      * Prüft im Pairing ein manuell eingegebenes Device-Token gegen `GET …/config`

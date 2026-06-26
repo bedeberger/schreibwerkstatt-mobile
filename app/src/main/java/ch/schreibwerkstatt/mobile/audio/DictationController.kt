@@ -3,6 +3,7 @@ package ch.schreibwerkstatt.mobile.audio
 import android.content.Context
 import android.media.MediaRecorder
 import android.os.Build
+import androidx.annotation.VisibleForTesting
 import ch.schreibwerkstatt.mobile.data.net.NetworkClient
 import ch.schreibwerkstatt.mobile.data.net.dto.ApiErrorDto
 import ch.schreibwerkstatt.mobile.data.prefs.SettingsStore
@@ -89,7 +90,7 @@ class DictationController(
             runCatching {
                 val baseUrl = settings.serverBaseUrlOnce() ?: error("Keine Server-URL")
                 val bytes = file.readBytes()
-                require(bytes.size <= 5 * 1024 * 1024) { "stt_audio_too_large" }
+                require(!segmentTooLarge(bytes.size)) { "stt_audio_too_large" }
                 val body = bytes.toRequestBody(mime.toMediaType())
                 val resp = net.stt(baseUrl).transcribe(bookId, pageId, body)
                 if (resp.isSuccessful) {
@@ -103,12 +104,28 @@ class DictationController(
             }
         }
 
-    private fun sttErrorMessage(httpCode: Int, code: String?): String = when (code ?: httpCode.toString()) {
-        "stt_disabled", "404" -> "Diktat ist auf dem Server deaktiviert."
-        "stt_audio_too_large", "413" -> "Audiosegment zu gross (max 5 MB)."
-        "stt_unsupported_audio", "415" -> "Audioformat nicht unterstützt."
-        "stt_timeout", "408" -> "Transkription hat zu lange gedauert."
-        "stt_upstream", "502" -> "STT-Dienst nicht erreichbar."
-        else -> "Transkription fehlgeschlagen (HTTP $httpCode)."
+    private fun sttErrorMessage(httpCode: Int, code: String?): String =
+        Companion.sttErrorMessage(httpCode, code)
+
+    companion object {
+        /** Server-Limit pro Audiosegment (siehe routes/stt.js). */
+        const val MAX_SEGMENT_BYTES: Int = 5 * 1024 * 1024
+
+        /**
+         * true, wenn ein Segment das Server-Limit überschreitet und gar nicht erst
+         * gesendet werden darf. Genau am Limit ist noch erlaubt.
+         */
+        @VisibleForTesting
+        fun segmentTooLarge(sizeBytes: Int): Boolean = sizeBytes > MAX_SEGMENT_BYTES
+
+        @VisibleForTesting
+        fun sttErrorMessage(httpCode: Int, code: String?): String = when (code ?: httpCode.toString()) {
+            "stt_disabled", "404" -> "Diktat ist auf dem Server deaktiviert."
+            "stt_audio_too_large", "413" -> "Audiosegment zu gross (max 5 MB)."
+            "stt_unsupported_audio", "415" -> "Audioformat nicht unterstützt."
+            "stt_timeout", "408" -> "Transkription hat zu lange gedauert."
+            "stt_upstream", "502" -> "STT-Dienst nicht erreichbar."
+            else -> "Transkription fehlgeschlagen (HTTP $httpCode)."
+        }
     }
 }

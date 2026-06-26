@@ -1,6 +1,8 @@
 package ch.schreibwerkstatt.mobile.editor
 
+import android.util.Log
 import android.webkit.JavascriptInterface
+import ch.schreibwerkstatt.mobile.BuildConfig
 import ch.schreibwerkstatt.mobile.data.repo.ContentRepository
 import ch.schreibwerkstatt.mobile.data.repo.SaveResult
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +33,10 @@ class EditorBridge(
     private val darkTheme: Boolean,
 ) {
     private val json = Json { explicitNulls = false }
+
+    private companion object {
+        const val TAG = "EditorBridge"
+    }
 
     @Serializable
     private data class BridgePage(val id: Long, val name: String?, val html: String?)
@@ -99,7 +105,11 @@ class EditorBridge(
     fun notifyError(msg: String) = onEvent(EditorEvent.Error(msg))
 
     @JavascriptInterface
-    fun log(msg: String) { /* in Debug-Builds via Logcat sichtbar machen, optional */ }
+    fun log(msg: String) {
+        // Editor-interne JS-Logs nur in Debug-Builds nach Logcat spiegeln —
+        // in Release bleibt die WebView still (keine PII/Inhalte ins Log).
+        if (BuildConfig.DEBUG) Log.d(TAG, msg)
+    }
 
     /** JS-/JSON-String-Literal (Quoting/Escaping) für die evaluateJavascript-Einbettung. */
     private fun jsString(value: String): String = json.encodeToString(String.serializer(), value)
