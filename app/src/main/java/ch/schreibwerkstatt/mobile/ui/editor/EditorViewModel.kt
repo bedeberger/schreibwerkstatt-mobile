@@ -67,7 +67,7 @@ class EditorViewModel(
                 .onFailure { _state.value = _state.value.copy(bundle = BundleState.Error(it.message ?: "Bundle-Fehler")) }
 
             // STT-Verfügbarkeit prüfen (Mic-Button nur bei stt.enabled).
-            runCatching { network.config(base).stt?.enabled == true }
+            runCatching { network.config(base).config().stt?.enabled == true }
                 .onSuccess { _state.value = _state.value.copy(sttEnabled = it) }
 
             // Schreibendes Gerät als Buch-Präsenz registrieren (best effort).

@@ -34,7 +34,7 @@ class SettingsViewModel(
             val base = settings.serverBaseUrlOnce().orEmpty()
             _state.value = _state.value.copy(serverUrl = base)
             if (base.isNotBlank()) {
-                val status = runCatching { network.config(base).stt?.enabled == true }
+                val status = runCatching { network.config(base).config().stt?.enabled == true }
                     .map { if (it) "aktiviert" else "deaktiviert" }
                     .getOrElse { "unbekannt" }
                 _state.value = _state.value.copy(sttStatus = status)

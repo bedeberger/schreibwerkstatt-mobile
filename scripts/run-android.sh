@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# Build, install und starte die App auf dem verbundenen Gerät/Emulator.
-# Aufruf:  scripts/run-android.sh
+# Build, install und starte die App auf einem Gerät/Emulator.
+#
+# Aufruf:
+#   scripts/run-android.sh                 # Auto: nimmt das einzige Gerät, sonst den Emulator
+#   scripts/run-android.sh emulator-5554   # gezielt dieses Gerät (Serial)
+#   ANDROID_SERIAL=... scripts/run-android.sh
 set -euo pipefail
 
 source "$(dirname "$0")/_sdk-env.sh"
@@ -10,17 +14,63 @@ ACTIVITY="${APP_ID}/${APP_ID}.MainActivity"
 
 cd "$REPO_ROOT"
 
-# Gerät vorhanden? Sonst Emulator starten.
-if ! "$ADB" devices | grep -qE '\b(device)$'; then
-  echo "Kein Gerät/Emulator verbunden — versuche Emulator zu starten ..."
+# Online-Geräte (Status == "device") als Liste ausgeben.
+list_devices() {
+  "$ADB" devices | awk '/\tdevice$/ {print $1}'
+}
+
+# Aus einer Geräteliste ein Ziel wählen: Emulator bevorzugen.
+pick_device() {
+  local devices=("$@") emu=""
+  for d in "${devices[@]}"; do
+    case "$d" in emulator-*) emu="$d"; break;; esac
+  done
+  if [ -n "$emu" ]; then echo "$emu"; else echo "${devices[0]}"; fi
+}
+
+# Wunschgerät via Argument oder ENV?
+TARGET="${1:-${ANDROID_SERIAL:-}}"
+
+# Online-Geräte einsammeln (portabel, ohne mapfile)
+DEVICES=()
+while IFS= read -r d; do [ -n "$d" ] && DEVICES+=("$d"); done < <(list_devices)
+
+# Kein Gerät -> Emulator starten und neu einsammeln
+if [ "${#DEVICES[@]}" -eq 0 ] && [ -z "$TARGET" ]; then
+  echo "Kein Gerät/Emulator verbunden — starte Emulator ..."
   "$(dirname "$0")/start-emulator.sh"
+  DEVICES=()
+  while IFS= read -r d; do [ -n "$d" ] && DEVICES+=("$d"); done < <(list_devices)
 fi
+
+if [ -n "$TARGET" ]; then
+  # Vorgegebenes Ziel muss online sein
+  if ! printf '%s\n' "${DEVICES[@]}" | grep -qx "$TARGET"; then
+    echo "Gerät '$TARGET' nicht gefunden/online. Verfügbar:" >&2
+    printf '  %s\n' "${DEVICES[@]:-（keine）}" >&2
+    exit 1
+  fi
+  SERIAL="$TARGET"
+elif [ "${#DEVICES[@]}" -eq 0 ]; then
+  echo "Weiterhin kein Gerät verfügbar. Prüfe 'adb devices'." >&2
+  exit 1
+elif [ "${#DEVICES[@]}" -eq 1 ]; then
+  SERIAL="${DEVICES[0]}"
+else
+  SERIAL="$(pick_device "${DEVICES[@]}")"
+  echo "Mehrere Geräte gefunden (${DEVICES[*]}) — wähle: $SERIAL"
+  echo "  (Override: scripts/run-android.sh <serial>  oder  ANDROID_SERIAL=<serial> ...)"
+fi
+
+# Gradle und adb auf das gewählte Gerät festnageln
+export ANDROID_SERIAL="$SERIAL"
+echo "==> Ziel: $ANDROID_SERIAL"
 
 echo "==> Build + Install (installDebug)"
 ./gradlew installDebug
 
 echo "==> Starte ${ACTIVITY}"
-"$ADB" shell am start -n "${ACTIVITY}"
+"$ADB" -s "$SERIAL" shell am start -n "${ACTIVITY}"
 
 echo "==> Logcat (Ctrl+C zum Beenden)"
-"$ADB" logcat --pid="$("$ADB" shell pidof -s "${APP_ID}" | tr -d '\r')"
+"$ADB" -s "$SERIAL" logcat --pid="$("$ADB" -s "$SERIAL" shell pidof -s "${APP_ID}" | tr -d '\r')"
