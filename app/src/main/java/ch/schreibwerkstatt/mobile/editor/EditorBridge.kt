@@ -27,6 +27,8 @@ class EditorBridge(
     private val evalJs: (String) -> Unit,
     /** Native UI-Events (Snackbar etc.). */
     private val onEvent: (EditorEvent) -> Unit,
+    /** Dark-Mode-Wunsch (folgt isSystemInDarkTheme); steuert `data-theme` in der WebView. */
+    private val darkTheme: Boolean,
 ) {
     private val json = Json { explicitNulls = false }
 
@@ -85,6 +87,10 @@ class EditorBridge(
             }
         }
     }
+
+    /** Synchroner Boot-Call aus host.html: setzt `data-theme` ohne Hell-Flash. */
+    @JavascriptInterface
+    fun prefersDark(): Boolean = darkTheme
 
     @JavascriptInterface
     fun onReady() = onEvent(EditorEvent.Ready)

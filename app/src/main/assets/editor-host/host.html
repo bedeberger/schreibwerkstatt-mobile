@@ -16,6 +16,19 @@
   <div id="mount"></div>
 
   <script>
+    // Theme synchron beim Boot setzen — der Editor-Kern reagiert auf
+    // <html data-theme="dark"> (Token-CSS `:root[data-theme="dark"]`), NICHT auf
+    // eine prefers-color-scheme-Media-Query. Wert kommt vom nativen Host
+    // (SWHost.prefersDark(), folgt isSystemInDarkTheme). Vor injectCss(), damit
+    // kein Hell-Flash entsteht.
+    (function () {
+      try {
+        const dark = window.SWHost && window.SWHost.prefersDark && window.SWHost.prefersDark();
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        if (dark) document.documentElement.style.background = '#1a1f3a';
+      } catch (e) { /* nicht-fatal: Editor läuft im Hell-Default weiter */ }
+    })();
+
     // Promise-Registry für die native Bridge. Die @JavascriptInterface-Methoden
     // (window.SWHost) sind synchrone Java-Calls; das eigentliche Ergebnis löst
     // die native Seite asynchron über window.__sw.resolve/reject ein

@@ -17,3 +17,10 @@
 # Retrofit
 -keep,allowobfuscation,allowshrinking interface retrofit2.Call
 -keep,allowobfuscation,allowshrinking class retrofit2.Response
+
+# Tink (via androidx.security.crypto → TokenStore/EncryptedSharedPreferences) referenziert
+# errorprone-Compile-Annotationen, die zur Laufzeit fehlen. Nur Warnungen unterdrücken.
+-dontwarn com.google.errorprone.annotations.CanIgnoreReturnValue
+-dontwarn com.google.errorprone.annotations.CheckReturnValue
+-dontwarn com.google.errorprone.annotations.Immutable
+-dontwarn com.google.errorprone.annotations.RestrictedApi

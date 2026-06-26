@@ -75,7 +75,7 @@ class EditorViewModel(
         }
     }
 
-    fun newBridge(evalJs: (String) -> Unit): EditorBridge =
+    fun newBridge(evalJs: (String) -> Unit, darkTheme: Boolean): EditorBridge =
         EditorBridge(
             repo = repo,
             scope = bridgeScope,
@@ -83,6 +83,7 @@ class EditorViewModel(
             bookId = bookId,
             evalJs = evalJs,
             onEvent = ::onEditorEvent,
+            darkTheme = darkTheme,
         )
 
     private fun onEditorEvent(event: EditorEvent) {

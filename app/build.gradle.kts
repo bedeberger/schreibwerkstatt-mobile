@@ -17,6 +17,17 @@ val appVersionName: String = versionProps.getProperty("versionName")
 val appVersionCode: Int = (versionProps.getProperty("versionCode")
     ?: error("versionCode fehlt in version.properties")).trim().toInt()
 
+// Release-Signing aus keystore.properties (gitignored). Fehlt die Datei (CI, frischer Checkout,
+// reine Debug-Builds), bleibt hasReleaseSigning=false und der Release-Build bleibt unsigniert,
+// statt den ganzen Build scheitern zu lassen.
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps = Properties().apply {
+    if (keystorePropsFile.exists()) keystorePropsFile.inputStream().use { load(it) }
+}
+val hasReleaseSigning = keystorePropsFile.exists() &&
+    listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+        .all { keystoreProps.getProperty(it)?.isNotBlank() == true }
+
 android {
     namespace = "ch.schreibwerkstatt.mobile"
     compileSdk = 35
@@ -33,6 +44,17 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -40,6 +62,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Nur signieren, wenn keystore.properties vorhanden ist (sonst unsignierter Build).
+            signingConfig = if (hasReleaseSigning) signingConfigs.getByName("release") else null
         }
         debug {
             isMinifyEnabled = false

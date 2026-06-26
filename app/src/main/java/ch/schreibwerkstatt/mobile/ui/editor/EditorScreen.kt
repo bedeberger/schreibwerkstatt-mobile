@@ -8,6 +8,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -56,6 +57,7 @@ fun EditorScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val darkTheme = isSystemInDarkTheme()
     val vm: EditorViewModel = viewModel(factory = EditorViewModel.factory(context.locator, bookId, pageId))
     val state by vm.state.collectAsStateWithLifecycle()
     val snackbarHost = remember { SnackbarHostState() }
@@ -121,10 +123,11 @@ fun EditorScreen(
                     Text("Editor-Bundle: ${b.message}", color = MaterialTheme.colorScheme.error)
                 }
                 is BundleState.Ready -> {
-                    val bridge = remember(b.dir) { vm.newBridge(evalJs) }
+                    val bridge = remember(b.dir, darkTheme) { vm.newBridge(evalJs, darkTheme) }
                     EditorWebView(
                         bundleDir = b.dir,
                         bridge = bridge,
+                        darkTheme = darkTheme,
                         onWebViewCreated = { webViewRef.value = it },
                     )
                 }
@@ -182,6 +185,7 @@ private fun jsString(value: String): String = JSONObject.quote(value)
 private fun EditorWebView(
     bundleDir: java.io.File,
     bridge: Any,
+    darkTheme: Boolean,
     onWebViewCreated: (WebView) -> Unit,
 ) {
     val context = LocalContext.current
@@ -195,6 +199,9 @@ private fun EditorWebView(
                 .build()
 
             WebView(context).apply {
+                // WebView-Hintergrund passend zum Theme, damit beim Laden kein
+                // weisser Blitz vor dem CSS-Inject aufscheint (Navy = Dark-BG).
+                setBackgroundColor(if (darkTheme) 0xFF1A1F3A.toInt() else 0xFFFAF7F2.toInt())
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 settings.allowFileAccess = false

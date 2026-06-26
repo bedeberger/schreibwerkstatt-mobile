@@ -10,6 +10,9 @@
 .cxx
 local.properties
 *.keystore
+*.jks
 !debug.keystore
+# Release-Signing: Pfade + Passwörter, nie ins VCS.
+keystore.properties
 /app/build/
 /app/release/
