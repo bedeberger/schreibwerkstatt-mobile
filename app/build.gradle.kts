@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,15 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
+
+// Version aus version.properties (einzige Quelle der Wahrheit, siehe CLAUDE.md).
+val versionProps = Properties().apply {
+    rootProject.file("version.properties").inputStream().use { load(it) }
+}
+val appVersionName: String = versionProps.getProperty("versionName")
+    ?: error("versionName fehlt in version.properties")
+val appVersionCode: Int = (versionProps.getProperty("versionCode")
+    ?: error("versionCode fehlt in version.properties")).trim().toInt()
 
 android {
     namespace = "ch.schreibwerkstatt.mobile"
@@ -14,11 +25,11 @@ android {
         applicationId = "ch.schreibwerkstatt.mobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         // X-Client-Version-Header (siehe AuthInterceptor) — aus versionName abgeleitet.
-        buildConfigField("String", "CLIENT_VERSION", "\"android/$versionName\"")
+        buildConfigField("String", "CLIENT_VERSION", "\"android/$appVersionName\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

@@ -4,10 +4,13 @@
     <!-- Pairing -->
     <string name="pairing_title">Gerät koppeln</string>
     <string name="pairing_server_label">Server-Adresse</string>
-    <string name="pairing_server_hint">https://schreibwerkstatt.example.ch</string>
-    <string name="pairing_device_label">Gerätename</string>
-    <string name="pairing_login">Anmelden &amp; koppeln</string>
-    <string name="pairing_intro">Melde dich am Server an. Anschliessend wird für dieses Gerät ein Zugangstoken erstellt und sicher gespeichert.</string>
+    <string name="pairing_server_hint">https://schreibwerkstatt.app</string>
+    <string name="pairing_token_label">Zugangstoken</string>
+    <string name="pairing_token_hint">swd_…</string>
+    <string name="pairing_device_label">Gerätename (optional)</string>
+    <string name="pairing_login">Koppeln</string>
+    <string name="pairing_intro">Server-Adresse eingeben und ein Zugangstoken einfügen. Das Token erstellst du am Server unter „Einstellungen → Geräte" und kopierst es hierher.</string>
+    <string name="pairing_busy">Token wird geprüft…</string>
 
     <!-- Books -->
     <string name="books_title">Bücher</string>

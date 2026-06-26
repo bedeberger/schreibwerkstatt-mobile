@@ -73,4 +73,16 @@ echo "==> Starte ${ACTIVITY}"
 "$ADB" -s "$SERIAL" shell am start -n "${ACTIVITY}"
 
 echo "==> Logcat (Ctrl+C zum Beenden)"
-"$ADB" -s "$SERIAL" logcat --pid="$("$ADB" -s "$SERIAL" shell pidof -s "${APP_ID}" | tr -d '\r')"
+# Kurz auf den App-Prozess warten (Activity-Start ist asynchron)
+PID=""
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  PID="$("$ADB" -s "$SERIAL" shell pidof -s "${APP_ID}" 2>/dev/null | tr -d '\r')"
+  [ -n "$PID" ] && break
+  sleep 0.5
+done
+if [ -n "$PID" ]; then
+  "$ADB" -s "$SERIAL" logcat --pid="$PID"
+else
+  echo "(PID nicht ermittelt — zeige ungefiltertes Logcat)"
+  "$ADB" -s "$SERIAL" logcat
+fi

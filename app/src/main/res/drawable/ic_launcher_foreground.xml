@@ -1,13 +1,55 @@
+<!-- Schreibwerkstatt-Logo: Buch + goldene Feder + KI-Funken (aus dem
+     Mutterprojekt-SVG, in die 108dp-Adaptive-Icon-Safe-Zone skaliert).
+     Group-Transform bildet die 680er-SVG-Koordinaten auf den zentralen
+     ~70dp-Bereich ab (scale 0.19, pivot 0/0). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Stilisierte Feder/„S" für Schreibwerkstatt. -->
-    <path
-        android:fillColor="#F5F7FA"
-        android:pathData="M70,32 C58,30 44,34 40,46 C37,55 43,60 50,61 C44,66 40,72 42,78 C45,86 56,86 64,80 C62,76 60,72 60,68 C66,66 72,60 72,52 C72,46 68,42 62,42 C66,38 70,36 70,32 Z" />
-    <path
-        android:fillColor="#9AE6B4"
-        android:pathData="M44,76 L40,82 L46,80 Z" />
+    <group
+        android:pivotX="0"
+        android:pivotY="0"
+        android:scaleX="0.19"
+        android:scaleY="0.19"
+        android:translateX="-13.26"
+        android:translateY="-4.33">
+
+        <!-- Buchkörper -->
+        <path android:fillColor="#2D6A9F" android:pathData="M170,230 h310 v240 h-310 z" />
+        <!-- Buchrücken -->
+        <path android:fillColor="#1D4B73" android:pathData="M170,230 h36 v240 h-36 z" />
+        <!-- Seitenblock -->
+        <path android:fillColor="#F0EDE8" android:pathData="M206,246 h258 v208 h-258 z" />
+
+        <!-- Textzeilen -->
+        <path android:strokeColor="#C8C0B4" android:strokeWidth="6" android:strokeLineCap="round" android:pathData="M230,285 L440,285" />
+        <path android:strokeColor="#C8C0B4" android:strokeWidth="6" android:strokeLineCap="round" android:pathData="M230,315 L440,315" />
+        <path android:strokeColor="#C8C0B4" android:strokeWidth="6" android:strokeLineCap="round" android:pathData="M230,345 L380,345" />
+        <path android:strokeColor="#C8C0B4" android:strokeWidth="6" android:strokeLineCap="round" android:pathData="M230,375 L440,375" />
+        <path android:strokeColor="#C8C0B4" android:strokeWidth="6" android:strokeLineCap="round" android:pathData="M230,405 L350,405" />
+
+        <!-- Federkiel -->
+        <path android:strokeColor="#C4A55A" android:strokeWidth="7" android:strokeLineCap="round" android:pathData="M380,430 L500,180" />
+        <!-- Federfahne rechts -->
+        <path android:fillColor="#E8D5A0" android:pathData="M500,180 C520,220 510,260 490,295 C475,320 460,340 440,360 L380,430 C400,400 415,370 425,340 C438,305 448,270 450,240 C455,210 500,180 500,180Z" />
+        <!-- Federfahne links -->
+        <path android:fillColor="#D4BC80" android:pathData="M500,180 C475,205 460,235 450,265 C438,298 428,328 420,355 L380,430 C395,408 410,382 420,355 C435,315 445,275 448,245 C452,215 500,180 500,180Z" />
+        <!-- Kiel-Spitze -->
+        <path android:fillColor="#8A6A20" android:pathData="M380,430 L372,452 L390,438Z" />
+
+        <!-- Funken-Linien -->
+        <path android:strokeColor="#7EB8F0" android:strokeWidth="5" android:strokeLineCap="round" android:pathData="M490,160 L510,140" />
+        <path android:strokeColor="#7EB8F0" android:strokeWidth="5" android:strokeLineCap="round" android:pathData="M512,195 L538,190" />
+        <path android:strokeColor="#A78BFA" android:strokeWidth="4" android:strokeLineCap="round" android:pathData="M500,225 L524,235" />
+        <path android:strokeColor="#A78BFA" android:strokeWidth="4" android:strokeLineCap="round" android:pathData="M472,148 L470,124" />
+        <path android:strokeColor="#34D399" android:strokeWidth="3" android:strokeLineCap="round" android:pathData="M455,162 L440,142" />
+
+        <!-- Leucht-Punkte an den Funkenspitzen -->
+        <path android:fillColor="#7EB8F0" android:pathData="M504,140 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 z" />
+        <path android:fillColor="#7EB8F0" android:pathData="M533,190 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 z" />
+        <path android:fillColor="#A78BFA" android:pathData="M520,235 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 z" />
+        <path android:fillColor="#A78BFA" android:pathData="M465,124 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 z" />
+        <path android:fillColor="#34D399" android:pathData="M436,142 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 z" />
+    </group>
 </vector>

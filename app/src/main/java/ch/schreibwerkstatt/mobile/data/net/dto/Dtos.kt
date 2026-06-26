@@ -3,32 +3,6 @@ package ch.schreibwerkstatt.mobile.data.net.dto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// ── Device-Token (Pairing) ──────────────────────────────────────────────────
-
-@Serializable
-data class CreateDeviceTokenRequest(
-    val device_name: String,
-    val platform: String = "android",
-)
-
-@Serializable
-data class CreateDeviceTokenResponse(
-    val token: DeviceTokenDto,
-)
-
-@Serializable
-data class DeviceTokenDto(
-    val id: Long? = null,
-    val user_email: String? = null,
-    val device_name: String? = null,
-    val platform: String? = null,
-    val scopes: String? = null,
-    val expires_at: String? = null,
-    val created_at: String? = null,
-    /** Nur einmalig in der Create-Response vorhanden. */
-    val plain_token: String? = null,
-)
-
 // ── Bücher / Baum ───────────────────────────────────────────────────────────
 
 @Serializable

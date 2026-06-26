@@ -26,6 +26,15 @@
       "presentation": { "reveal": "always", "panel": "shared", "clear": true }
     },
     {
+      "label": "Android: Run on Pixel 10 Pro",
+      "type": "shell",
+      "command": "scripts/run-android.sh",
+      "args": ["adb-57091FDCH00B4Y-Hrn9VX._adb-tls-connect._tcp"],
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
       "label": "Android: Clean",
       "type": "shell",
       "command": "./gradlew",

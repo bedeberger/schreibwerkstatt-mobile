@@ -4,5 +4,6 @@
     <style name="Theme.Schreibwerkstatt" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+        <item name="android:windowBackground">@color/brand_window_bg</item>
     </style>
 </resources>

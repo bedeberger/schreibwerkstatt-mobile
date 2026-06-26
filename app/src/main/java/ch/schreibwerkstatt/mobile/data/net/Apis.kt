@@ -2,8 +2,6 @@ package ch.schreibwerkstatt.mobile.data.net
 
 import ch.schreibwerkstatt.mobile.data.net.dto.BookDto
 import ch.schreibwerkstatt.mobile.data.net.dto.ConfigDto
-import ch.schreibwerkstatt.mobile.data.net.dto.CreateDeviceTokenRequest
-import ch.schreibwerkstatt.mobile.data.net.dto.CreateDeviceTokenResponse
 import ch.schreibwerkstatt.mobile.data.net.dto.PageDto
 import ch.schreibwerkstatt.mobile.data.net.dto.SavePageRequest
 import ch.schreibwerkstatt.mobile.data.net.dto.SyncResponse
@@ -18,17 +16,6 @@ import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
-
-/**
- * Geräte-Token-Ausstellung. Läuft im Pairing-WebView gegen die interaktive
- * Google-OIDC-Session (Cookie-Auth), NICHT über den Bearer-Interceptor.
- */
-interface AuthApi {
-    @POST("me/device-tokens")
-    suspend fun createDeviceToken(
-        @Body body: CreateDeviceTokenRequest,
-    ): Response<CreateDeviceTokenResponse>
-}
 
 interface ConfigApi {
     @GET("config")

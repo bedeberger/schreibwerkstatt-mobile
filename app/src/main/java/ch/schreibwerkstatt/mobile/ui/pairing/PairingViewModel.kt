@@ -6,32 +6,37 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import ch.schreibwerkstatt.mobile.ServiceLocator
-import ch.schreibwerkstatt.mobile.data.net.dto.CreateDeviceTokenResponse
+import ch.schreibwerkstatt.mobile.data.net.NetworkClient
+import ch.schreibwerkstatt.mobile.data.net.VerifyResult
 import ch.schreibwerkstatt.mobile.data.prefs.SettingsStore
 import ch.schreibwerkstatt.mobile.data.prefs.TokenStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
+
+const val DEFAULT_SERVER_URL = "https://schreibwerkstatt.app"
+private const val TOKEN_PREFIX = "swd_"
 
 data class PairingUiState(
-    val serverUrl: String = "",
+    val serverUrl: String = DEFAULT_SERVER_URL,
+    val token: String = "",
     val deviceName: String = "",
-    val step: Step = Step.ConfigUrl,
-    val loadUrl: String? = null,
     val error: String? = null,
     val busy: Boolean = false,
-) {
-    enum class Step { ConfigUrl, WebLogin }
-}
+)
 
+/**
+ * Manuelles Pairing wie beim Mac-Client: der Nutzer gibt die Server-Adresse ein
+ * und fügt ein am Server (Einstellungen → Geräte) vorab erzeugtes Device-Token
+ * (`swd_…`) ein. Das Token wird gegen `GET …/config` verifiziert und erst bei
+ * Erfolg verschlüsselt im [TokenStore] abgelegt.
+ */
 class PairingViewModel(
     private val settings: SettingsStore,
     private val tokenStore: TokenStore,
+    private val network: NetworkClient,
 ) : ViewModel() {
-
-    private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
     private val _state = MutableStateFlow(PairingUiState(deviceName = android.os.Build.MODEL ?: "Android"))
     val state: StateFlow<PairingUiState> = _state.asStateFlow()
@@ -45,70 +50,49 @@ class PairingViewModel(
     }
 
     fun onServerUrlChange(v: String) { _state.value = _state.value.copy(serverUrl = v, error = null) }
+    fun onTokenChange(v: String) { _state.value = _state.value.copy(token = v, error = null) }
     fun onDeviceNameChange(v: String) { _state.value = _state.value.copy(deviceName = v) }
 
-    /** URL prüfen, persistieren und in den WebLogin-Schritt wechseln. */
-    fun proceedToLogin() {
-        val raw = _state.value.serverUrl.trim()
-        if (!raw.startsWith("http://") && !raw.startsWith("https://")) {
+    /**
+     * URL + Token prüfen, Token gegen den Server verifizieren und bei Erfolg
+     * speichern. [onPaired] wird nur bei erfolgreichem Pairing aufgerufen.
+     */
+    fun couple(onPaired: () -> Unit) {
+        val rawUrl = _state.value.serverUrl.trim()
+        val token = _state.value.token.trim()
+
+        if (!rawUrl.startsWith("http://") && !rawUrl.startsWith("https://")) {
             _state.value = _state.value.copy(error = "URL muss mit http:// oder https:// beginnen")
             return
         }
-        val normalized = SettingsStore.normalizeBaseUrl(raw)
-        viewModelScope.launch { settings.setServerBaseUrl(normalized) }
-        _state.value = _state.value.copy(
-            serverUrl = normalized,
-            loadUrl = normalized + "/",
-            step = PairingUiState.Step.WebLogin,
-            error = null,
-        )
-    }
+        if (!token.startsWith(TOKEN_PREFIX)) {
+            _state.value = _state.value.copy(error = "Token muss mit $TOKEN_PREFIX beginnen")
+            return
+        }
 
-    fun backToConfig() {
-        _state.value = _state.value.copy(step = PairingUiState.Step.ConfigUrl, loadUrl = null, error = null)
-    }
+        val normalized = SettingsStore.normalizeBaseUrl(rawUrl)
+        _state.value = _state.value.copy(serverUrl = normalized, busy = true, error = null)
 
-    /** JS-Snippet, das in der eingeloggten Session den Device-Token zieht. */
-    fun coupleScript(): String {
-        val name = _state.value.deviceName.ifBlank { "Android" }.replace("\"", "\\\"")
-        return """
-            (function(){
-              fetch('/me/device-tokens', {
-                method:'POST', credentials:'include',
-                headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({ device_name: "$name", platform: "android" })
-              })
-              .then(function(r){ if(!r.ok){ return r.text().then(function(t){ throw new Error('HTTP '+r.status+' '+t); }); } return r.json(); })
-              .then(function(j){ SWPair.onToken(JSON.stringify(j)); })
-              .catch(function(e){ SWPair.onError(String(e && e.message || e)); });
-            })();
-        """.trimIndent()
-    }
-
-    fun setBusy(b: Boolean) { _state.value = _state.value.copy(busy = b) }
-    fun setError(msg: String) { _state.value = _state.value.copy(error = msg, busy = false) }
-
-    /** Token-Antwort verarbeiten und sicher ablegen. Liefert true bei Erfolg. */
-    fun onTokenJson(raw: String): Boolean {
-        return try {
-            val resp = json.decodeFromString(CreateDeviceTokenResponse.serializer(), raw)
-            val plain = resp.token.plain_token
-            if (plain.isNullOrBlank()) {
-                setError("Antwort ohne plain_token")
-                false
-            } else {
-                tokenStore.save(plain, resp.token.device_name ?: _state.value.deviceName, resp.token.id)
-                true
+        viewModelScope.launch {
+            settings.setServerBaseUrl(normalized)
+            when (val r = network.verifyToken(normalized, token)) {
+                is VerifyResult.Ok -> {
+                    val label = _state.value.deviceName.ifBlank { "Android" }
+                    tokenStore.save(token, label, null)
+                    _state.value = _state.value.copy(busy = false)
+                    onPaired()
+                }
+                is VerifyResult.Unauthorized ->
+                    _state.value = _state.value.copy(busy = false, error = "Token ungültig oder widerrufen.")
+                is VerifyResult.Failed ->
+                    _state.value = _state.value.copy(busy = false, error = "Server nicht erreichbar: ${r.message}")
             }
-        } catch (e: Exception) {
-            setError("Token konnte nicht gelesen werden: ${e.message}")
-            false
         }
     }
 
     companion object {
         fun factory(locator: ServiceLocator): ViewModelProvider.Factory = viewModelFactory {
-            initializer { PairingViewModel(locator.settings, locator.tokenStore) }
+            initializer { PairingViewModel(locator.settings, locator.tokenStore, locator.network) }
         }
     }
 }

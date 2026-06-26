@@ -1,10 +1,14 @@
 package ch.schreibwerkstatt.mobile.data.net
 
+import ch.schreibwerkstatt.mobile.BuildConfig
 import ch.schreibwerkstatt.mobile.data.prefs.TokenStore
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import java.util.concurrent.TimeUnit
@@ -63,4 +67,37 @@ class NetworkClient(
     fun content(baseUrl: String): ContentApi = retrofitFor(baseUrl).create(ContentApi::class.java)
     fun stt(baseUrl: String): SttApi = retrofitFor(baseUrl).create(SttApi::class.java)
     fun config(baseUrl: String): ConfigApi = retrofitFor(baseUrl).create(ConfigApi::class.java)
+
+    /**
+     * Prüft im Pairing ein manuell eingegebenes Device-Token gegen `GET …/config`
+     * (liegt hinter dem Auth-Guard). Bewusst eigenständig — mit explizitem
+     * `Authorization`-Header statt über [AuthInterceptor]/[TokenStore], weil das
+     * Token erst nach erfolgreicher Prüfung abgelegt wird.
+     */
+    suspend fun verifyToken(baseUrl: String, token: String): VerifyResult = withContext(Dispatchers.IO) {
+        val normalized = baseUrl.trimEnd('/') + "/"
+        val request = Request.Builder()
+            .url(normalized + "config")
+            .header("Authorization", "Bearer $token")
+            .header("X-Client-Version", BuildConfig.CLIENT_VERSION)
+            .get()
+            .build()
+        try {
+            okHttp().newCall(request).execute().use { resp ->
+                when {
+                    resp.isSuccessful -> VerifyResult.Ok
+                    resp.code == 401 -> VerifyResult.Unauthorized
+                    else -> VerifyResult.Failed("HTTP ${resp.code}")
+                }
+            }
+        } catch (e: Exception) {
+            VerifyResult.Failed(e.message ?: e.javaClass.simpleName)
+        }
+    }
+}
+
+sealed interface VerifyResult {
+    object Ok : VerifyResult
+    object Unauthorized : VerifyResult
+    data class Failed(val message: String) : VerifyResult
 }
