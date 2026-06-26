@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Datenschutzerklärung – Schreibwerkstatt (Android)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: Georgia, "Times New Roman", serif; line-height: 1.6;
+           max-width: 720px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem;
+           color: #1a1f2e; background: #fbfaf7; }
+    header { border-bottom: 1px solid #e3ddd2; margin-bottom: 1.5rem; padding-bottom: 1rem; }
+    h1 { font-size: 1.9rem; margin: 0 0 .25rem; }
+    .sub { color: #6b6457; margin: 0; }
+    .meta { color: #8a8378; font-size: .9rem; }
+    h2 { font-size: 1.2rem; margin: 1.8rem 0 .4rem; }
+    ul { padding-left: 1.2rem; }
+    a { color: #2d6a9f; }
+    footer { margin-top: 2.5rem; border-top: 1px solid #e3ddd2; padding-top: 1rem; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Schreibwerkstatt</h1>
+    <p class="sub">Datenschutzerklärung – Android-App</p>
+  </header>
+
+  <p class="meta">Stand: 26. Juni 2026</p>
+  <p>Der Schutz deiner Daten ist uns wichtig. Diese Erklärung beschreibt, welche Daten bei der Nutzung der Android-App „Schreibwerkstatt“ und beim Betrieb des dahinterliegenden Dienstes bearbeitet werden, zu welchem Zweck und welche Rechte dir zustehen.</p>
+
+  <h2>1. Verantwortlicher</h2>
+  <p>Verantwortlich für die Datenbearbeitung ist David Berger, Basel, Schweiz, bede.berger@gmail.com. Als Schweizer Betreiber richtet sich die Bearbeitung nach dem revidierten Datenschutzgesetz (nDSG); für Nutzerinnen und Nutzer aus der EU gilt zusätzlich die DSGVO.</p>
+
+  <h2>2. Erhobene Daten</h2>
+  <p>Wir bearbeiten ausschliesslich Daten, die für den Betrieb des Dienstes notwendig sind:</p>
+  <ul>
+    <li>Kontodaten: E-Mail-Adresse, Anzeigename und Angaben aus der Registrierungs-Anfrage.</li>
+    <li>Schreibinhalte: die von dir erstellten Bücher, Kapitel, Seiten und Texte, die mit dem von dir gewählten Server synchronisiert werden.</li>
+    <li>Geräte-Token: dient der Anmeldung der App am Server und wird serverseitig ausschliesslich als SHA256-Hash gespeichert.</li>
+    <li>Sprachaufnahmen (Diktat): bei Nutzung der Diktatfunktion werden kurze Audioaufnahmen an den Server zur Spracherkennung übermittelt (siehe Abschnitt 6).</li>
+    <li>Technische Server-Logs: IP-Adresse, Zeitstempel und User-Agent zur Betriebssicherheit.</li>
+  </ul>
+
+  <h2>3. Zweck und Rechtsgrundlage</h2>
+  <p>Die Daten dienen der Bereitstellung des Schreib- und Synchronisierungsdienstes (Vertragserfüllung) sowie der Betriebssicherheit und Missbrauchsabwehr (berechtigtes Interesse).</p>
+
+  <h2>4. Speicherung und Hosting</h2>
+  <p>Der Dienst wird vom Betreiber self-hosted auf eigener Infrastruktur in der Schweiz betrieben; es kommt kein externer Hosting-Dienstleister zum Einsatz. Alle Konto- und Schreibinhalte werden auf diesen Servern in der Schweiz gespeichert.</p>
+
+  <h2>5. Verarbeitung auf dem Gerät (Android-App)</h2>
+  <p>Die App ist ein offline-fähiger Client. Schreibinhalte werden lokal auf deinem Gerät zwischengespeichert (Room-Cache), damit du auch ohne Verbindung arbeiten kannst, und nur mit dem von dir gewählten Server synchronisiert. Das Geräte-Token zur Anmeldung wird verschlüsselt im gerätelokalen, geschützten Speicher (Android EncryptedSharedPreferences) abgelegt und verlässt dein Gerät nicht im Klartext. Eine zufällige Installations-Kennung dient ausschliesslich der Konflikt- und Anwesenheits-Zuordnung bei der Synchronisierung und ist vom Anmelde-Token getrennt. Daten werden ausschliesslich an die von dir konfigurierte Server-Adresse übertragen; in selbst-gehosteten Netzwerken ohne TLS kann diese Übertragung unverschlüsselt (HTTP) erfolgen – verwende daher in öffentlichen Netzen einen über HTTPS erreichbaren Server.</p>
+
+  <h2>6. Mikrofon und Spracherkennung (Diktat)</h2>
+  <p>Die App nutzt das Mikrofon ausschliesslich, wenn du die Diktatfunktion aktiv startest. Die Aufnahme wird als kurzes Audiosegment an den Server übermittelt und dort in Text umgewandelt; die Spracherkennung läuft self-hosted auf der Infrastruktur des Betreibers, es werden dabei keine Audiodaten an externe Dritte übermittelt. Der erkannte Text wird in deine Seite eingefügt; es findet keine dauerhafte Hintergrund-Aufnahme statt.</p>
+
+  <h2>7. KI-Verarbeitung der Inhalte</h2>
+  <p>Für Funktionen wie Analyse, Lektorat, Buchbewertung und Chat werden die jeweils betroffenen Schreibinhalte an einen KI-Dienst übermittelt. Welcher Dienst zum Einsatz kommt, wird pro Nutzerkonto konfiguriert. Standardmässig werden die Modelle von Anthropic (Claude) verwendet; dabei werden die Inhalte zur Verarbeitung an Anthropic in die USA übermittelt (Übermittlung in ein Drittland; Anthropic stützt sich hierfür auf vertragliche Garantien wie die EU-Standardvertragsklauseln). Alternativ kann ein auf der Infrastruktur des Betreibers self-hosted betriebenes Modell konfiguriert werden, bei dem keine Inhalte an externe Dritte übermittelt werden. Die übermittelten Inhalte werden ausschliesslich zur Erbringung der angeforderten Funktion verarbeitet und nach den API-Bedingungen des Anbieters nicht zum Training seiner Modelle verwendet.</p>
+
+  <h2>8. Weitergabe an Dritte</h2>
+  <p>Es findet keine Weitergabe zu Werbe- oder Analysezwecken statt, und es wird kein Tracking und keine Profilbildung betrieben. Der Dienst wird auf eigener Infrastruktur des Betreibers betrieben; für das Hosting werden keine externen Auftragsverarbeiter eingesetzt. Die einzige Übermittlung von Inhalten an einen externen Dienst betrifft die KI-Verarbeitung und ist gesondert im Abschnitt „KI-Verarbeitung der Inhalte“ beschrieben.</p>
+
+  <h2>9. Deine Rechte</h2>
+  <p>Du hast das Recht auf Auskunft, Berichtigung, Löschung, Datenübertragbarkeit und Widerspruch. Die Löschung deines Kontos und deiner Daten kannst du jederzeit formlos per E-Mail an bede.berger@gmail.com veranlassen. Es besteht ein Beschwerderecht bei der zuständigen Aufsichtsbehörde (Schweiz: EDÖB; EU: die jeweils zuständige Datenschutzbehörde).</p>
+
+  <h2>10. Änderungen</h2>
+  <p>Diese Datenschutzerklärung kann angepasst werden. Massgebend ist die jeweils auf dieser Seite veröffentlichte Fassung.</p>
+
+  <footer>
+    Schreibwerkstatt · Android-Client · Kontakt: bede.berger@gmail.com
+  </footer>
+</body>
+</html>

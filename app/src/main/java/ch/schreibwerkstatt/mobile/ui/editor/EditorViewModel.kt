@@ -33,6 +33,8 @@ data class EditorUiState(
     val sttEnabled: Boolean = false,
     val recording: Boolean = false,
     val transcribing: Boolean = false,
+    /** Live-Pegel des Mikrofons (0..1) während der Aufnahme – treibt die Pegel-Anzeige. */
+    val level: Float = 0f,
     val snackbar: String? = null,
     val conflict: EditorEvent.Conflict? = null,
 )
@@ -132,7 +134,7 @@ class EditorViewModel(
         if (!dictation.isRecording) {
             dictation.startRecording()
                 .onSuccess {
-                    _state.value = _state.value.copy(recording = true)
+                    _state.value = _state.value.copy(recording = true, level = 0f)
                     monitorJob = viewModelScope.launch { monitorSilence(onText) }
                 }
                 .onFailure { _state.value = _state.value.copy(snackbar = "Aufnahme fehlgeschlagen: ${it.message}") }
@@ -155,7 +157,13 @@ class EditorViewModel(
         while (dictation.isRecording) {
             delay(POLL_MS)
             elapsedMs += POLL_MS
-            if (dictation.currentAmplitude() >= SPEECH_AMPLITUDE) {
+            val amplitude = dictation.currentAmplitude()
+            // Live-Pegel für die UI normalisieren (0..1). Geglättet, damit die
+            // Anzeige nicht flackert: neuer Wert zieht den alten anteilig nach.
+            val target = (amplitude / LEVEL_FULL_SCALE).coerceIn(0f, 1f)
+            val smoothed = _state.value.level + (target - _state.value.level) * LEVEL_SMOOTHING
+            _state.value = _state.value.copy(level = smoothed)
+            if (amplitude >= SPEECH_AMPLITUDE) {
                 spoke = true
                 silentMs = 0L
             } else {
@@ -172,7 +180,7 @@ class EditorViewModel(
 
     private fun transcribeCurrentSegment(onText: (String) -> Unit) {
         if (!dictation.isRecording) return
-        _state.value = _state.value.copy(recording = false, transcribing = true)
+        _state.value = _state.value.copy(recording = false, transcribing = true, level = 0f)
         viewModelScope.launch {
             dictation.stopAndTranscribe(bookId, pageId)
                 .onSuccess { text ->
@@ -218,6 +226,10 @@ class EditorViewModel(
         private const val SPEECH_AMPLITUDE = 1_500
         /** Stille-Dauer nach Sprache, die ein Segment automatisch beendet. */
         private const val SILENCE_HANGOVER_MS = 2_000L
+        /** Amplitude (0..32767), die in der Pegel-Anzeige als Vollausschlag gilt. */
+        private const val LEVEL_FULL_SCALE = 12_000f
+        /** Glättungsfaktor (0..1) der Pegel-Anzeige; höher = reaktiver. */
+        private const val LEVEL_SMOOTHING = 0.4f
         /** Harte Obergrenze pro Segment (Schutz vor dem 5-MB-Server-Limit). */
         private const val MAX_SEGMENT_MS = 120_000L
 

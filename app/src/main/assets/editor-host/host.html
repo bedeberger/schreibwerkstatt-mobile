@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>Schreibwerkstatt Editor</title>
   <style>
+    /* Das OTA-Bundle wird ohne den globalen base.css-Reset des Mutterprojekts
+       geladen (steht nicht in dessen CSS_FILES), daher gilt im WebView der
+       CSS-Default box-sizing:content-box. Der Focus-Container nutzt aber
+       width:100% PLUS padding-left/right (focus-mode.css) → die Box wird breiter
+       als der Viewport und ragt rechts hinaus, wo das overflow-x:hidden unten
+       genau das rechte Padding samt letztem Zeichen abschneidet. Das Bundle ist
+       gegen border-box gebaut (base.css erzwingt es auf Web/Mac); hier stellen
+       wir diese Annahme wieder her. */
+    *, *::before, *::after { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; background: var(--color-bg, #fff); }
     #mount { height: 100%; }
     /* Kein horizontaler Überlauf an der Wurzel: sonst kann ein zu breites
