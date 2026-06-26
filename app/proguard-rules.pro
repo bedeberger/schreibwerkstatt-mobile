@@ -1,0 +1,19 @@
+# Kotlinx-Serialization: generierte Serializer behalten.
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.**
+-keepclassmembers class **$$serializer { *; }
+-keepclasseswithmembers class ch.schreibwerkstatt.mobile.data.net.dto.** {
+    *** Companion;
+}
+-keepclassmembers class ch.schreibwerkstatt.mobile.data.net.dto.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+
+# @JavascriptInterface-Methoden der Editor-Bridge dürfen nicht entfernt/umbenannt werden.
+-keepclassmembers class ch.schreibwerkstatt.mobile.editor.EditorBridge {
+    @android.webkit.JavascriptInterface <methods>;
+}
+
+# Retrofit
+-keep,allowobfuscation,allowshrinking interface retrofit2.Call
+-keep,allowobfuscation,allowshrinking class retrofit2.Response

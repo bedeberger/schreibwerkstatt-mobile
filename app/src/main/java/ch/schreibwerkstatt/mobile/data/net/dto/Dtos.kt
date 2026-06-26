@@ -1,0 +1,163 @@
+package ch.schreibwerkstatt.mobile.data.net.dto
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+// ── Device-Token (Pairing) ──────────────────────────────────────────────────
+
+@Serializable
+data class CreateDeviceTokenRequest(
+    val device_name: String,
+    val platform: String = "android",
+)
+
+@Serializable
+data class CreateDeviceTokenResponse(
+    val token: DeviceTokenDto,
+)
+
+@Serializable
+data class DeviceTokenDto(
+    val id: Long? = null,
+    val user_email: String? = null,
+    val device_name: String? = null,
+    val platform: String? = null,
+    val scopes: String? = null,
+    val expires_at: String? = null,
+    val created_at: String? = null,
+    /** Nur einmalig in der Create-Response vorhanden. */
+    val plain_token: String? = null,
+)
+
+// ── Bücher / Baum ───────────────────────────────────────────────────────────
+
+@Serializable
+data class BookDto(
+    val id: Long,
+    val name: String,
+    val role: String? = null,
+    val owner_email: String? = null,
+    val buchtyp: String? = null,
+)
+
+@Serializable
+data class TreeDto(
+    val chapters: List<ChapterNodeDto> = emptyList(),
+    val topPages: List<TreePageDto> = emptyList(),
+)
+
+@Serializable
+data class ChapterNodeDto(
+    val id: Long,
+    val name: String,
+    val position: Int? = null,
+    val parent_chapter_id: Long? = null,
+    val children: List<ChapterNodeDto> = emptyList(),
+    /** Manche Tree-Builder hängen Seiten direkt unter den Kapitelknoten. */
+    val pages: List<TreePageDto> = emptyList(),
+)
+
+@Serializable
+data class TreePageDto(
+    val id: Long,
+    val name: String,
+    val chapter_id: Long? = null,
+)
+
+// ── Seiten ──────────────────────────────────────────────────────────────────
+
+@Serializable
+data class PageDto(
+    val id: Long,
+    val name: String? = null,
+    val chapter_id: Long? = null,
+    val html: String? = null,
+    val updated_at: String? = null,
+)
+
+@Serializable
+data class SavePageRequest(
+    val html: String,
+    val device_id: String,
+    val source: String = "main",
+)
+
+/** 409 PAGE_CONFLICT-Body. */
+@Serializable
+data class PageConflictDto(
+    val error_code: String? = null,
+    val server_updated_at: String? = null,
+    val server_editor_email: String? = null,
+    val server_editor_name: String? = null,
+)
+
+/** 423 PAGE_LOCKED-Body. */
+@Serializable
+data class PageLockedDto(
+    val error_code: String? = null,
+    val locked_by_email: String? = null,
+    val expires_at: String? = null,
+)
+
+// ── Delta-Sync ──────────────────────────────────────────────────────────────
+
+@Serializable
+data class SyncResponse(
+    val now: String,
+    val pages: List<SyncPageDto> = emptyList(),
+    val has_more: Boolean = false,
+    val cursor: SyncCursorDto? = null,
+)
+
+@Serializable
+data class SyncPageDto(
+    val page_id: Long,
+    val page_name: String? = null,
+    val chapter_id: Long? = null,
+    val updated_at: String? = null,
+    val html: String? = null,
+)
+
+@Serializable
+data class SyncCursorDto(
+    val since: String? = null,
+    val since_id: Long? = null,
+)
+
+// ── /config (nur STT-relevanter Teil) ───────────────────────────────────────
+
+@Serializable
+data class ConfigDto(
+    val stt: SttConfigDto? = null,
+)
+
+@Serializable
+data class SttConfigDto(
+    val enabled: Boolean = false,
+    val provider: String? = null,
+    val vad: SttVadDto? = null,
+)
+
+@Serializable
+data class SttVadDto(
+    val silenceMs: Long = 800,
+    val threshold: Double = 0.015,
+    val maxSegmentS: Int = 30,
+)
+
+// ── STT ─────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class TranscribeResponse(
+    val text: String = "",
+)
+
+/** Generischer Fehler-Body ({ error_code } oder { error }). */
+@Serializable
+data class ApiErrorDto(
+    val error_code: String? = null,
+    val error: String? = null,
+    val detail: String? = null,
+) {
+    val code: String? get() = error_code ?: error
+}

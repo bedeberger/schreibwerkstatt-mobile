@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Die Server-Basis-URL ist variabel (self-hosted), daher kann sie nicht
+     domain-scoped freigegeben werden. Cleartext (http) wird erlaubt, damit
+     LAN-/Self-Hosted-Server ohne TLS erreichbar sind. Für produktive
+     Deployments dringend HTTPS verwenden. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

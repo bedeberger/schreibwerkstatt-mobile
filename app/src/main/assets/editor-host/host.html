@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Schreibwerkstatt Editor</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: var(--color-bg, #fff); }
+    #mount { height: 100%; }
+    .sw-boot-error {
+      font: 15px/1.5 system-ui, sans-serif; color: #b00020; padding: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div id="mount"></div>
+
+  <script>
+    // Promise-Registry für die native Bridge. Die @JavascriptInterface-Methoden
+    // (window.SWHost) sind synchrone Java-Calls; das eigentliche Ergebnis löst
+    // die native Seite asynchron über window.__sw.resolve/reject ein
+    // (via evaluateJavascript).
+    (function () {
+      const pending = new Map();
+      let seq = 0;
+      window.__sw = {
+        nextId() { return 'r' + (++seq); },
+        track(id) {
+          return new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
+        },
+        resolve(id, json) {
+          const p = pending.get(id); if (!p) return; pending.delete(id);
+          try { p.resolve(json ? JSON.parse(json) : null); }
+          catch (e) { p.reject(e); }
+        },
+        reject(id, msg) {
+          const p = pending.get(id); if (!p) return; pending.delete(id);
+          p.reject(new Error(msg || 'bridge error'));
+        },
+        // Von der nativen Diktat-Schicht aufgerufen: Text am Cursor der aktiven
+        // Focus-Seite einfügen.
+        insertText(text) {
+          try {
+            const el = document.querySelector('.focus-editor.is-active .focus-editor__content')
+              || document.querySelector('.focus-editor__content');
+            if (!el) return;
+            el.focus();
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) {
+              el.appendChild(document.createTextNode(text));
+            } else {
+              const range = sel.getRangeAt(0);
+              range.deleteContents();
+              const node = document.createTextNode(text);
+              range.insertNode(node);
+              range.setStartAfter(node); range.setEndAfter(node);
+              sel.removeAllRanges(); sel.addRange(range);
+            }
+            el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+          } catch (e) { /* nicht-fatal */ }
+        },
+        // Seite ohne Speichern austauschen (native Navigation).
+        setPage(json) {
+          try { window.__swHandle?.setPage(json ? JSON.parse(json) : null); }
+          catch (e) {}
+        },
+        setGranularity(g) { try { window.__swHandle?.setGranularity(g); } catch (e) {} },
+        async save() { try { await window.__swHandle?.save(); } catch (e) {} },
+      };
+    })();
+
+    function bootError(msg) {
+      document.getElementById('mount').innerHTML =
+        '<div class="sw-boot-error">Editor konnte nicht geladen werden:<br>' +
+        String(msg).replace(/</g, '&lt;') + '</div>';
+      try { window.SWHost && window.SWHost.notifyError(String(msg)); } catch (e) {}
+    }
+
+    // CSS-Closure aus dem Bundle-Manifest laden und injizieren (gleiche Reihenfolge
+    // wie der Server-Builder, CSS_FILES). Robust gegen Drift: keine fixe Liste hier.
+    async function injectCss() {
+      try {
+        const manifest = await fetch('./bundle-manifest.json').then(r => r.json());
+        for (const href of (manifest.cssFiles || [])) {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = './' + href;
+          document.head.appendChild(link);
+        }
+      } catch (e) { /* CSS optional — Editor läuft auch ohne Styles */ }
+    }
+
+    // Bridge, die der Editor-Kern erwartet (siehe focus/standalone.js):
+    //   loadPage(): Promise<{ id, name, html }>
+    //   savePage({ id, name, html }): Promise<any>
+    const bridge = {
+      granularity: 'paragraph',
+      typewriterAnchor: 0.5,
+      loadPage() {
+        if (!window.SWHost) return Promise.reject(new Error('SWHost fehlt'));
+        const id = window.__sw.nextId();
+        const p = window.__sw.track(id);
+        window.SWHost.loadPage(id);
+        return p;
+      },
+      savePage(page) {
+        if (!window.SWHost) return Promise.reject(new Error('SWHost fehlt'));
+        const id = window.__sw.nextId();
+        const p = window.__sw.track(id);
+        window.SWHost.savePage(id, JSON.stringify(page || {}));
+        return p;
+      },
+    };
+
+    (async function boot() {
+      try {
+        await injectCss();
+        const mod = await import('./js/editor/focus/standalone.js');
+        const handle = await mod.mountStandaloneFocus({
+          mount: document.getElementById('mount'),
+          bridge,
+        });
+        window.__swHandle = handle;
+        try { window.SWHost && window.SWHost.onReady(); } catch (e) {}
+      } catch (e) {
+        bootError(e && e.stack || e);
+      }
+    })();
+  </script>
+</body>
+</html>

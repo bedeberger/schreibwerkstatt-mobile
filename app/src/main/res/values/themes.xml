@@ -1,0 +1,8 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Basis-Theme. Die eigentliche Farbgebung kommt aus Compose (Material3
+         dynamic color). Hier nur ein neutrales Splash-/Window-Theme. -->
+    <style name="Theme.Schreibwerkstatt" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+    </style>
+</resources>
