@@ -8,6 +8,10 @@
 -keepclassmembers class ch.schreibwerkstatt.mobile.data.net.dto.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
+# GitHub-Release-DTOs der Update-Prüfung (UpdateChecker).
+-keepclassmembers class ch.schreibwerkstatt.mobile.update.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
 
 # @JavascriptInterface-Methoden der Editor-Bridge dürfen nicht entfernt/umbenannt werden.
 -keepclassmembers class ch.schreibwerkstatt.mobile.editor.EditorBridge {

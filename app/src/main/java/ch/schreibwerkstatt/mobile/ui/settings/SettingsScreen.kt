@@ -26,8 +26,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.schreibwerkstatt.mobile.BuildConfig
 import ch.schreibwerkstatt.mobile.R
 import ch.schreibwerkstatt.mobile.locator
+import ch.schreibwerkstatt.mobile.update.UpdateState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,6 +40,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val vm: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(context.locator))
     val state by vm.state.collectAsStateWithLifecycle()
+    val updateState by context.locator.updateManager.state.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -69,6 +72,28 @@ fun SettingsScreen(
             ListItem(
                 headlineContent = { Text(stringResource(R.string.settings_stt_status)) },
                 supportingContent = { Text(state.sttStatus) },
+            )
+            HorizontalDivider()
+            val checking = updateState is UpdateState.Checking
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_version)) },
+                supportingContent = {
+                    Text(
+                        when {
+                            checking -> stringResource(R.string.settings_checking_update)
+                            updateState is UpdateState.UpToDate -> stringResource(R.string.settings_up_to_date)
+                            else -> BuildConfig.VERSION_NAME
+                        }
+                    )
+                },
+                trailingContent = {
+                    OutlinedButton(
+                        onClick = { context.locator.updateManager.checkNow() },
+                        enabled = !checking,
+                    ) {
+                        Text(stringResource(R.string.settings_check_update))
+                    }
+                },
             )
             HorizontalDivider()
             Column(

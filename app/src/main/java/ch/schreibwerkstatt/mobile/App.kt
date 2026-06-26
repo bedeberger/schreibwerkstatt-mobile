@@ -12,6 +12,7 @@ import ch.schreibwerkstatt.mobile.data.prefs.SettingsStore
 import ch.schreibwerkstatt.mobile.data.prefs.TokenStore
 import ch.schreibwerkstatt.mobile.data.repo.ContentRepository
 import ch.schreibwerkstatt.mobile.data.repo.SyncCoordinator
+import ch.schreibwerkstatt.mobile.update.UpdateManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,6 +38,7 @@ class ServiceLocator(context: Context) {
     val syncCoordinator: SyncCoordinator by lazy {
         SyncCoordinator(repository, connectivity, tokenStore, applicationScope)
     }
+    val updateManager: UpdateManager by lazy { UpdateManager(appContext, applicationScope) }
 
     fun dictationController(): DictationController =
         DictationController(appContext, network, settings)

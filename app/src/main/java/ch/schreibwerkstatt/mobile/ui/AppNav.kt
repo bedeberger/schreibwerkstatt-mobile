@@ -11,6 +11,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import ch.schreibwerkstatt.mobile.ServiceLocator
 import ch.schreibwerkstatt.mobile.ui.books.BooksScreen
+import ch.schreibwerkstatt.mobile.ui.components.UpdateDialog
 import ch.schreibwerkstatt.mobile.ui.editor.EditorScreen
 import ch.schreibwerkstatt.mobile.ui.pairing.PairingScreen
 import ch.schreibwerkstatt.mobile.ui.settings.SettingsScreen
@@ -36,6 +37,8 @@ fun AppNav(locator: ServiceLocator) {
 
     val start = if (isPaired) Routes.BOOKS else Routes.PAIRING
 
+    val updateState by locator.updateManager.state.collectAsStateWithLifecycle()
+
     // Token-Verlust (401 / Abmelden) → zurück zum Pairing, Backstack leeren.
     LaunchedEffect(isPaired) {
         if (!isPaired) {
@@ -43,6 +46,9 @@ fun AppNav(locator: ServiceLocator) {
                 popUpTo(0) { inclusive = true }
                 launchSingleTop = true
             }
+        } else {
+            // Beim Start einmal still nach einem neuen Release prüfen.
+            locator.updateManager.checkOnLaunch()
         }
     }
 
@@ -107,4 +113,17 @@ fun AppNav(locator: ServiceLocator) {
             )
         }
     }
+
+    // Update-Dialog über allen Screens (Auto-Check beim Start + manueller Check in Settings).
+    UpdateDialog(
+        state = updateState,
+        onDownload = {
+            (updateState as? ch.schreibwerkstatt.mobile.update.UpdateState.Available)?.let {
+                locator.updateManager.download(it.release)
+            }
+        },
+        onRetryInstall = { locator.updateManager.retryInstall() },
+        onOpenPermissionSettings = { locator.updateManager.openInstallPermissionSettings() },
+        onDismiss = { locator.updateManager.dismiss() },
+    )
 }

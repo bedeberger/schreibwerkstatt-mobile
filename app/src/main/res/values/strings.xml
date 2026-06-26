@@ -26,6 +26,24 @@
     <string name="settings_signout">Dieses Gerät abmelden</string>
     <string name="settings_signout_hint">Abmelden entfernt nur das lokale Token von diesem Gerät. Den Token serverseitig zu widerrufen ist über die Web-Oberfläche möglich.</string>
     <string name="settings_stt_status">Diktat (STT)</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_check_update">Auf Updates prüfen</string>
+    <string name="settings_checking_update">Wird geprüft…</string>
+    <string name="settings_up_to_date">Du verwendest bereits die neueste Version.</string>
+
+    <!-- Update-Dialog -->
+    <string name="update_available_title">Update verfügbar</string>
+    <string name="update_available_message">Version %1$s ist verfügbar. Jetzt herunterladen und installieren?</string>
+    <string name="update_download">Herunterladen</string>
+    <string name="update_downloading">Wird heruntergeladen… %1$d %%</string>
+    <string name="update_later">Später</string>
+    <string name="update_error_title">Update fehlgeschlagen</string>
+    <string name="update_permission_title">Installation erlauben</string>
+    <string name="update_permission_message">Damit die App das Update installieren kann, musst du „Aus dieser Quelle installieren" erlauben. Danach erneut auf Installieren tippen.</string>
+    <string name="update_permission_open">Einstellungen öffnen</string>
+    <string name="update_install">Installieren</string>
+    <string name="action_close">Schliessen</string>
+    <string name="action_retry">Erneut versuchen</string>
 
     <!-- Tree (Kapitel-/Seitenbaum) -->
     <string name="tree_page_updated">Zuletzt geändert: %1$s</string>

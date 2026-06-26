@@ -41,6 +41,11 @@ android {
 
         // X-Client-Version-Header (siehe AuthInterceptor) — aus versionName abgeleitet.
         buildConfigField("String", "CLIENT_VERSION", "\"android/$appVersionName\"")
+
+        // GitHub-Repo für die In-App-Update-Prüfung (UpdateChecker liest dort
+        // releases/latest). Distributionskanal, NICHT die Mutterprojekt-Server-API.
+        buildConfigField("String", "UPDATE_GITHUB_OWNER", "\"bedeberger\"")
+        buildConfigField("String", "UPDATE_GITHUB_REPO", "\"schreibwerkstatt-mobile\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
