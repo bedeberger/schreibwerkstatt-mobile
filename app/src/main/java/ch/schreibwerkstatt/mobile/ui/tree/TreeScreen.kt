@@ -25,8 +25,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -39,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.schreibwerkstatt.mobile.R
 import ch.schreibwerkstatt.mobile.locator
+import ch.schreibwerkstatt.mobile.ui.components.SearchField
 import ch.schreibwerkstatt.mobile.ui.components.SyncStatusBar
 import java.time.Instant
 import java.time.ZoneId
@@ -61,6 +66,17 @@ fun TreeScreen(
     val online by coordinator.online.collectAsStateWithLifecycle()
     val pendingCount by coordinator.pendingCount.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    var query by rememberSaveable { mutableStateOf("") }
+    // Bei aktiver Suche flach nur passende Seiten zeigen (Kapitelkontext entfällt, depth = 0).
+    val visibleRows by remember(state.rows) {
+        derivedStateOf {
+            val q = query.trim()
+            if (q.isEmpty()) state.rows
+            else state.rows.filterIsInstance<TreeRow.Page>()
+                .filter { it.name.contains(q, ignoreCase = true) }
+                .map { it.copy(depth = 0) }
+        }
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -76,6 +92,13 @@ fun TreeScreen(
                     scrollBehavior = scrollBehavior,
                 )
                 SyncStatusBar(online = online, pendingCount = pendingCount)
+                if (state.rows.isNotEmpty()) {
+                    SearchField(
+                        query = query,
+                        onQueryChange = { query = it },
+                        placeholder = stringResource(R.string.tree_search_hint),
+                    )
+                }
             }
         },
     ) { padding ->
@@ -105,11 +128,22 @@ fun TreeScreen(
                 }
             }
 
+            visibleRows.isEmpty() && query.trim().isNotEmpty() -> Box(
+                Modifier.fillMaxSize().padding(padding).padding(32.dp), contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    stringResource(R.string.search_no_results, query.trim()),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = padding,
             ) {
-                itemsIndexed(state.rows) { _, row ->
+                itemsIndexed(visibleRows) { _, row ->
                     val indent = (row.depth * 16).dp
                     when (row) {
                         is TreeRow.Chapter -> ListItem(

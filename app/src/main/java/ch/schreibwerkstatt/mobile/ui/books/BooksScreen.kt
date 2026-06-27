@@ -27,8 +27,12 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -41,6 +45,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.schreibwerkstatt.mobile.R
 import ch.schreibwerkstatt.mobile.data.db.BookEntity
 import ch.schreibwerkstatt.mobile.locator
+import ch.schreibwerkstatt.mobile.ui.components.SearchField
 import ch.schreibwerkstatt.mobile.ui.components.SyncStatusBar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,6 +64,14 @@ fun BooksScreen(
     val error by vm.error.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val snackbarHostState = remember { SnackbarHostState() }
+    var query by rememberSaveable { mutableStateOf("") }
+    val filteredBooks by remember(books) {
+        derivedStateOf {
+            val q = query.trim()
+            if (q.isEmpty()) books
+            else books.filter { it.name.contains(q, ignoreCase = true) }
+        }
+    }
 
     val loadErrorTemplate = stringResource(R.string.books_load_error)
     LaunchedEffect(error) {
@@ -83,6 +96,13 @@ fun BooksScreen(
                     scrollBehavior = scrollBehavior,
                 )
                 SyncStatusBar(online = online, pendingCount = pendingCount)
+                if (books.isNotEmpty()) {
+                    SearchField(
+                        query = query,
+                        onQueryChange = { query = it },
+                        placeholder = stringResource(R.string.books_search_hint),
+                    )
+                }
             }
         },
     ) { padding ->
@@ -118,9 +138,18 @@ fun BooksScreen(
                         )
                     }
                 }
+            } else if (filteredBooks.isEmpty()) {
+                Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        stringResource(R.string.search_no_results, query.trim()),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
-                    items(books, key = { it.id }) { book ->
+                    items(filteredBooks, key = { it.id }) { book ->
                         ListItem(
                             headlineContent = { Text(book.name) },
                             supportingContent = book.role

@@ -3,6 +3,8 @@
 
     <!-- Allgemein -->
     <string name="action_back">Zurück</string>
+    <string name="search_clear">Suche löschen</string>
+    <string name="search_no_results">Keine Treffer für „%1$s".</string>
 
     <!-- Pairing -->
     <string name="pairing_title">Gerät koppeln</string>
@@ -17,6 +19,7 @@
 
     <!-- Books -->
     <string name="books_title">Bücher</string>
+    <string name="books_search_hint">Buch suchen</string>
     <string name="books_empty">Keine Bücher gefunden.</string>
     <string name="books_empty_hint">Zum Aktualisieren nach unten ziehen.</string>
     <string name="books_load_error">Bücher konnten nicht geladen werden: %1$s</string>
@@ -46,6 +49,7 @@
     <string name="action_retry">Erneut versuchen</string>
 
     <!-- Tree (Kapitel-/Seitenbaum) -->
+    <string name="tree_search_hint">Seite suchen</string>
     <string name="tree_page_updated">Zuletzt geändert: %1$s</string>
     <string name="tree_page_updated_unknown">Noch nicht synchronisiert</string>
     <string name="tree_load_error">Fehler beim Laden: %1$s</string>
