@@ -26,7 +26,8 @@ data class ChapterNodeDto(
     val name: String,
     val position: Int? = null,
     val parent_chapter_id: Long? = null,
-    val children: List<ChapterNodeDto> = emptyList(),
+    /** Verschachtelte Unterkapitel (Server-Schlüssel `subchapters`, gleiche Shape). */
+    val subchapters: List<ChapterNodeDto> = emptyList(),
     /** Manche Tree-Builder hängen Seiten direkt unter den Kapitelknoten. */
     val pages: List<TreePageDto> = emptyList(),
 )
@@ -47,6 +48,32 @@ data class PageDto(
     val chapter_id: Long? = null,
     val html: String? = null,
     val updated_at: String? = null,
+)
+
+/**
+ * Neue Seite anlegen (`POST content/pages`). Mindestens eines von `book_id`/
+ * `chapter_id` muss gesetzt sein; `name` ist Pflicht. Für Tagebuch-Einträge ist
+ * `name` der ISO-Tag `YYYY-MM-DD`. Antwort = [PageDto] (Extra-Felder ignoriert).
+ */
+@Serializable
+data class CreatePageRequest(
+    val book_id: Long? = null,
+    val chapter_id: Long? = null,
+    val name: String,
+    val html: String? = null,
+)
+
+/**
+ * Neues Kapitel anlegen (`POST content/chapters`). `book_id` + `name` Pflicht;
+ * `parent_chapter_id` für verschachtelte (Monats-)Kapitel, `position` für die
+ * Sortierung (Jahr = Jahrzahl, Monat = 1–12). Antwort = [ChapterNodeDto].
+ */
+@Serializable
+data class CreateChapterRequest(
+    val book_id: Long,
+    val name: String,
+    val position: Int? = null,
+    val parent_chapter_id: Long? = null,
 )
 
 @Serializable

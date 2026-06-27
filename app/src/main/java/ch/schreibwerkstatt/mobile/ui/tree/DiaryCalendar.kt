@@ -1,0 +1,195 @@
+package ch.schreibwerkstatt.mobile.ui.tree
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import ch.schreibwerkstatt.mobile.R
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.format.TextStyle
+import java.util.Locale
+
+/**
+ * Monats-Kalender für Tagebuch-Bücher. Tage mit vorhandenem Eintrag sind
+ * hervorgehoben; Tippen öffnet den Eintrag, Tippen auf einen leeren Tag legt
+ * ihn an. Der Button legt (oder öffnet) den Eintrag für heute an.
+ */
+@Composable
+fun DiaryCalendar(
+    month: YearMonth,
+    entries: Map<String, Long>,
+    creating: Boolean,
+    onPrevMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onDayClick: (dateIso: String) -> Unit,
+    onTodayClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val locale = Locale.getDefault()
+    val today = LocalDate.now()
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // Kopf: Monat + Navigation
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onPrevMonth) {
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    contentDescription = stringResource(R.string.calendar_prev_month),
+                )
+            }
+            Text(
+                text = monthLabel(month, locale),
+                modifier = Modifier.weight(1f),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            IconButton(onClick = onNextMonth) {
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = stringResource(R.string.calendar_next_month),
+                )
+            }
+        }
+
+        // Wochentags-Header (Mo … So)
+        Row(Modifier.fillMaxWidth()) {
+            for (i in 0..6) {
+                val dow = DayOfWeek.MONDAY.plus(i.toLong())
+                Text(
+                    text = dow.getDisplayName(TextStyle.SHORT, locale),
+                    modifier = Modifier.weight(1f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        // 6 Wochen × 7 Tage
+        val first = month.atDay(1)
+        val offset = (first.dayOfWeek.value + 6) % 7  // Montag = 0
+        val gridStart = first.minusDays(offset.toLong())
+        for (week in 0 until 6) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                for (dow in 0 until 7) {
+                    val date = gridStart.plusDays((week * 7 + dow).toLong())
+                    DayCell(
+                        date = date,
+                        inMonth = date.month == month.month,
+                        hasEntry = entries.containsKey(date.toString()),
+                        isToday = date == today,
+                        onClick = { onDayClick(date.toString()) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+
+        Button(
+            onClick = onTodayClick,
+            enabled = !creating,
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        ) {
+            if (creating) {
+                CircularProgressIndicator(
+                    modifier = Modifier.padding(end = 8.dp),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+            }
+            Text(stringResource(R.string.calendar_today_entry))
+        }
+    }
+}
+
+@Composable
+private fun DayCell(
+    date: LocalDate,
+    inMonth: Boolean,
+    hasEntry: Boolean,
+    isToday: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val bg = if (hasEntry) scheme.primaryContainer else scheme.surfaceVariant.copy(alpha = 0.4f)
+    val fg = when {
+        hasEntry -> scheme.onPrimaryContainer
+        inMonth -> scheme.onSurface
+        else -> scheme.onSurfaceVariant.copy(alpha = 0.5f)
+    }
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
+            .then(
+                if (isToday) Modifier.border(2.dp, scheme.primary, RoundedCornerShape(8.dp))
+                else Modifier
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = date.dayOfMonth.toString(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = fg,
+                fontWeight = if (hasEntry || isToday) FontWeight.Bold else FontWeight.Normal,
+            )
+            if (hasEntry) {
+                Box(
+                    Modifier
+                        .padding(top = 2.dp)
+                        .size(5.dp)
+                        .clip(CircleShape)
+                        .background(scheme.primary),
+                )
+            }
+        }
+    }
+}
+
+private fun monthLabel(month: YearMonth, locale: Locale): String {
+    val name = month.month.getDisplayName(TextStyle.FULL, locale)
+        .replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
+    return "$name ${month.year}"
+}

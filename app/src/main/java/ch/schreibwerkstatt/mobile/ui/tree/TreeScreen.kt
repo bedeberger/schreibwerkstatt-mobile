@@ -4,15 +4,18 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -21,10 +24,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,8 +73,11 @@ fun TreeScreen(
     val pendingCount by coordinator.pendingCount.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     var query by rememberSaveable { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+    // Kalender ist aktiv, wenn Buch ein Tagebuch ist UND der Kalender-Modus läuft.
+    val calendar = state.isDiary && state.calendarMode
     // Bei aktiver Suche flach nur passende Seiten zeigen (Kapitelkontext entfällt, depth = 0).
-    val visibleRows by remember(state.rows) {
+    val visibleRows by remember(state.rows, query) {
         derivedStateOf {
             val q = query.trim()
             if (q.isEmpty()) state.rows
@@ -78,8 +87,18 @@ fun TreeScreen(
         }
     }
 
+    // Einmalige Fehlermeldung (z.B. Eintrag konnte nicht angelegt werden).
+    val createError = stringResource(R.string.calendar_create_error)
+    LaunchedEffect(state.message) {
+        if (state.message != null) {
+            snackbarHostState.showSnackbar(createError)
+            vm.consumeMessage()
+        }
+    }
+
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
                 TopAppBar(
@@ -89,10 +108,27 @@ fun TreeScreen(
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                         }
                     },
+                    actions = {
+                        if (state.isDiary) {
+                            IconButton(onClick = { vm.setCalendarMode(!state.calendarMode) }) {
+                                if (state.calendarMode) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.ViewList,
+                                        contentDescription = stringResource(R.string.calendar_show_list),
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Filled.CalendarMonth,
+                                        contentDescription = stringResource(R.string.calendar_show),
+                                    )
+                                }
+                            }
+                        }
+                    },
                     scrollBehavior = scrollBehavior,
                 )
                 SyncStatusBar(online = online, pendingCount = pendingCount)
-                if (state.rows.isNotEmpty()) {
+                if (!calendar && state.rows.isNotEmpty()) {
                     SearchField(
                         query = query,
                         onQueryChange = { query = it },
@@ -126,6 +162,25 @@ fun TreeScreen(
                         textAlign = TextAlign.Center,
                     )
                 }
+            }
+
+            calendar -> Column(
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                DiaryCalendar(
+                    month = state.calendarMonth,
+                    entries = state.diaryEntries,
+                    creating = state.creatingEntry,
+                    onPrevMonth = { vm.stepMonth(-1) },
+                    onNextMonth = { vm.stepMonth(1) },
+                    onDayClick = { dateIso -> vm.openOrCreateEntry(dateIso, onOpenPage) },
+                    onTodayClick = {
+                        vm.openOrCreateEntry(java.time.LocalDate.now().toString(), onOpenPage)
+                    },
+                )
             }
 
             visibleRows.isEmpty() && query.trim().isNotEmpty() -> Box(

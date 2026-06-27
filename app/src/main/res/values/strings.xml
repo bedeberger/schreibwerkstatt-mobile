@@ -54,6 +54,14 @@
     <string name="tree_page_updated_unknown">Noch nicht synchronisiert</string>
     <string name="tree_load_error">Fehler beim Laden: %1$s</string>
 
+    <!-- Tagebuch / Kalender -->
+    <string name="calendar_show">Kalender anzeigen</string>
+    <string name="calendar_show_list">Liste anzeigen</string>
+    <string name="calendar_today_entry">Heutiger Eintrag</string>
+    <string name="calendar_prev_month">Vorheriger Monat</string>
+    <string name="calendar_next_month">Nächster Monat</string>
+    <string name="calendar_create_error">Eintrag konnte nicht erstellt werden. Bist du online?</string>
+
     <!-- Editor / Dictation -->
     <string name="editor_dictate">Diktieren</string>
     <string name="editor_stop">Stopp</string>

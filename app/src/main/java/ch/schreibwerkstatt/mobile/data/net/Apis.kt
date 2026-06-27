@@ -1,7 +1,10 @@
 package ch.schreibwerkstatt.mobile.data.net
 
 import ch.schreibwerkstatt.mobile.data.net.dto.BookDto
+import ch.schreibwerkstatt.mobile.data.net.dto.ChapterNodeDto
 import ch.schreibwerkstatt.mobile.data.net.dto.ConfigDto
+import ch.schreibwerkstatt.mobile.data.net.dto.CreateChapterRequest
+import ch.schreibwerkstatt.mobile.data.net.dto.CreatePageRequest
 import ch.schreibwerkstatt.mobile.data.net.dto.PageDto
 import ch.schreibwerkstatt.mobile.data.net.dto.SavePageRequest
 import ch.schreibwerkstatt.mobile.data.net.dto.SyncResponse
@@ -40,6 +43,14 @@ interface ContentApi {
 
     @GET("content/pages/{pageId}")
     suspend fun page(@Path("pageId") pageId: Long): PageDto
+
+    /** Neue Seite anlegen (z.B. Tagebuch-Eintrag mit Name `YYYY-MM-DD`). */
+    @POST("content/pages")
+    suspend fun createPage(@Body body: CreatePageRequest): Response<PageDto>
+
+    /** Neues Kapitel anlegen (Jahr-/Monats-Kapitel für Tagebuch-Bücher). */
+    @POST("content/chapters")
+    suspend fun createChapter(@Body body: CreateChapterRequest): Response<ChapterNodeDto>
 
     /** 200 → PageDto · 409 PAGE_CONFLICT · 423 PAGE_LOCKED (Body via errorBody). */
     @PUT("content/pages/{pageId}")
