@@ -1,6 +1,7 @@
 package ch.schreibwerkstatt.mobile.data.db
 
 import androidx.room.Entity
+import androidx.room.Fts4
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -23,10 +24,24 @@ data class PageEntity(
     val chapterId: Long? = null,
     val name: String? = null,
     val html: String? = null,
+    /** Aus [html] gestrippter Klartext für die Volltextsuche (FTS-Index + Snippets). */
+    val plain: String? = null,
     /** Server-Stand (ISO-8601 Z). Für Konflikt-Vergleich. */
     val updatedAt: String? = null,
     /** true = lokale, noch nicht bestätigte Änderung (Pending-Write existiert). */
     val dirty: Boolean = false,
+)
+
+/**
+ * FTS4-Spiegel von [PageEntity] über den Klartext ([PageEntity.plain]) für die
+ * lokale Volltextsuche im Seiteninhalt. External-Content-Tabelle: Room hält sie
+ * per generierter Trigger automatisch mit `pages` synchron — daher nie direkt
+ * beschreiben, nur `pages` mutieren. `rowid` == `pages.id`.
+ */
+@Fts4(contentEntity = PageEntity::class)
+@Entity(tableName = "pages_fts")
+data class PageFtsEntity(
+    val plain: String? = null,
 )
 
 /** Delta-Sync-Cursor pro Buch. Erstaufruf ohne Cursor = Baseline. */

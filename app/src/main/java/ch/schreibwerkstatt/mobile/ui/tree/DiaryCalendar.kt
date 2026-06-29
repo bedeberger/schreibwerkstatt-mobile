@@ -28,12 +28,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ch.schreibwerkstatt.mobile.R
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -55,6 +62,7 @@ fun DiaryCalendar(
 ) {
     val locale = Locale.getDefault()
     val today = LocalDate.now()
+    val todayHasEntry = entries.containsKey(today.toString())
 
     Column(
         modifier = modifier
@@ -124,7 +132,7 @@ fun DiaryCalendar(
 
         Button(
             onClick = onTodayClick,
-            enabled = !creating,
+            enabled = !creating && !todayHasEntry,
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
         ) {
             if (creating) {
@@ -156,6 +164,13 @@ private fun DayCell(
         inMonth -> scheme.onSurface
         else -> scheme.onSurfaceVariant.copy(alpha = 0.5f)
     }
+    // Screenreader liest sonst nur die nackte Tageszahl. Vollständiges Datum +
+    // Zustand (heute / Eintrag) als ein zusammengefasstes Label ansagen.
+    val description = buildList {
+        add(date.format(dayDescFormatter))
+        if (isToday) add(stringResource(R.string.a11y_calendar_today))
+        add(stringResource(if (hasEntry) R.string.a11y_calendar_has_entry else R.string.a11y_calendar_no_entry))
+    }.joinToString(", ")
     Box(
         modifier = modifier
             .aspectRatio(1f)
@@ -165,7 +180,11 @@ private fun DayCell(
                 if (isToday) Modifier.border(2.dp, scheme.primary, RoundedCornerShape(8.dp))
                 else Modifier
             )
-            .clickable(onClick = onClick),
+            .clickable(onClickLabel = stringResource(R.string.a11y_action_open), onClick = onClick)
+            .semantics {
+                contentDescription = description
+                role = Role.Button
+            },
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -174,6 +193,8 @@ private fun DayCell(
                 style = MaterialTheme.typography.bodyMedium,
                 color = fg,
                 fontWeight = if (hasEntry || isToday) FontWeight.Bold else FontWeight.Normal,
+                // Zahl nicht separat vorlesen – das Box-Label deckt sie ab.
+                modifier = Modifier.clearAndSetSemantics {},
             )
             if (hasEntry) {
                 Box(
@@ -187,6 +208,10 @@ private fun DayCell(
         }
     }
 }
+
+/** Vollständiges, lokalisiertes Datum für Screenreader-Labels der Kalenderzellen. */
+private val dayDescFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(Locale.getDefault())
 
 private fun monthLabel(month: YearMonth, locale: Locale): String {
     val name = month.month.getDisplayName(TextStyle.FULL, locale)

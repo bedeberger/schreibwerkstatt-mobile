@@ -8,16 +8,21 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import ch.schreibwerkstatt.mobile.ServiceLocator
 import ch.schreibwerkstatt.mobile.data.net.NetworkClient
 import ch.schreibwerkstatt.mobile.data.prefs.SettingsStore
+import ch.schreibwerkstatt.mobile.data.prefs.ThemeMode
 import ch.schreibwerkstatt.mobile.data.prefs.TokenStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class SettingsUiState(
     val serverUrl: String = "",
     val deviceName: String = "",
     val sttStatus: String = "…",
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val deviceId: String = "",
+    val backgroundSync: Boolean = true,
 )
 
 class SettingsViewModel(
@@ -32,14 +37,28 @@ class SettingsViewModel(
     init {
         viewModelScope.launch {
             val base = settings.serverBaseUrlOnce().orEmpty()
-            _state.value = _state.value.copy(serverUrl = base)
+            _state.update { it.copy(serverUrl = base, deviceId = settings.deviceId()) }
             if (base.isNotBlank()) {
                 val status = runCatching { network.config(base).config().stt?.enabled == true }
                     .map { if (it) "aktiviert" else "deaktiviert" }
                     .getOrElse { "unbekannt" }
-                _state.value = _state.value.copy(sttStatus = status)
+                _state.update { it.copy(sttStatus = status) }
             }
         }
+        viewModelScope.launch {
+            settings.themeMode.collect { mode -> _state.update { it.copy(themeMode = mode) } }
+        }
+        viewModelScope.launch {
+            settings.backgroundSync.collect { on -> _state.update { it.copy(backgroundSync = on) } }
+        }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch { settings.setThemeMode(mode) }
+    }
+
+    fun setBackgroundSync(enabled: Boolean) {
+        viewModelScope.launch { settings.setBackgroundSync(enabled) }
     }
 
     /** Lokales Abmelden: nur den Token verwerfen (kein Server-Revoke). */

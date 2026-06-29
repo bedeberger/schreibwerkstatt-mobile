@@ -16,6 +16,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -56,7 +59,16 @@ fun SyncStatusBar(
             else ->
                 pluralStringResource(R.plurals.sync_pending_online, pendingCount, pendingCount)
         }
-        Surface(color = container, contentColor = content, modifier = modifier.fillMaxWidth()) {
+        Surface(
+            color = container,
+            contentColor = content,
+            // Als Live-Region zusammengefasst: TalkBack liest beim Ein-/Umblenden
+            // den Statustext vor. Das Icon bleibt dekorativ (contentDescription=null),
+            // da der Text den Zustand bereits vollständig benennt.
+            modifier = modifier
+                .fillMaxWidth()
+                .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

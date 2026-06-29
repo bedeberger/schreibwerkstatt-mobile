@@ -106,6 +106,48 @@ data class PageLockedDto(
     val expires_at: String? = null,
 )
 
+// ── Seiten-Versionen (Revisions) ─────────────────────────────────────────────
+
+/**
+ * Eine gespeicherte Seitenversion. In der Listen-Antik kommt sie ohne
+ * `body_html` (nur Metadaten); im Detail-Abruf ist `body_html` gesetzt.
+ */
+@Serializable
+data class RevisionDto(
+    val id: Long,
+    val page_id: Long? = null,
+    val book_id: Long? = null,
+    val chars: Int? = null,
+    val words: Int? = null,
+    val tok: Int? = null,
+    /** Herkunft der Version (`focus`/`main`/`chat-apply`/`macapp`/…). */
+    val source: String? = null,
+    val user_email: String? = null,
+    /** Browser-/OS-Kennung bzw. nativer Client-Label. */
+    val client: String? = null,
+    val created_at: String? = null,
+    val summary: String? = null,
+    /** Voller HTML-Stand – nur in der Detail-Antwort gesetzt. */
+    val body_html: String? = null,
+)
+
+@Serializable
+data class RevisionListResponse(
+    val revisions: List<RevisionDto> = emptyList(),
+)
+
+@Serializable
+data class RevisionDetailResponse(
+    val revision: RevisionDto? = null,
+)
+
+/** Antwort auf das Zurücksetzen (`…/restore`). */
+@Serializable
+data class RestoreResponse(
+    val ok: Boolean = false,
+    val restored_from: Long? = null,
+)
+
 // ── Delta-Sync ──────────────────────────────────────────────────────────────
 
 @Serializable

@@ -9,10 +9,12 @@ Native **Android-Client** (Kotlin/Jetpack Compose) zur Web-App **schreibwerkstat
 ```
 ./gradlew assembleDebug      # Debug-APK bauen (Standard-Test nach jeder Änderung)
 ./gradlew :app:compileDebugKotlin   # schneller reiner Compile-Check
+./gradlew testDebugUnitTest   # JVM-Unit-Tests (Robolectric/JUnit)
 ./gradlew lint                # Android-Lint
 ```
 
 - **Pflicht: Nach jeder Code-Änderung `./gradlew assembleDebug` ausführen** und den Erfolg verifizieren, bevor die Änderung als fertig gilt. Schlägt der Build fehl, zuerst fixen.
+- **Tests:** JVM-Unit-Tests in [app/src/test/](app/src/test/java/ch/schreibwerkstatt/mobile) sichern bewusst die **Harten Regeln** ab (Auth-Header auf jedem Request, `SaveResult`-Pfade, Delta-Pull überschreibt nie dirty, Pending-Queue, STT-Grösse, URL-/Client-Version-Normalisierung) — kein UI-/Compose-Test. **Nach Änderungen unter `data/` `./gradlew testDebugUnitTest` ausführen.** Ein `Stop`-Hook ([.claude/hooks/run-unit-tests.sh](.claude/hooks/run-unit-tests.sh)) tut das am Turn-Ende automatisch, sobald `.kt`-Dateien geändert wurden, und blockiert bei rotem Lauf.
 - **Toolchain:** Compile-Target ist **JDK 17** (`compileOptions`/`kotlinOptions`). Gradle 8.11.1 selbst läuft nur auf **JDK 17–23** — ein installiertes JDK 24+ als `JAVA_HOME` lässt den Wrapper scheitern. Bei Bedarf `JAVA_HOME` auf ein JDK 17/21 zeigen (z.B. das von Android Studio gebündelte JBR).
 - Android SDK aus `local.properties` (`sdk.dir`); nicht ins VCS committen.
 
@@ -23,11 +25,12 @@ Native **Android-Client** (Kotlin/Jetpack Compose) zur Web-App **schreibwerkstat
 
 ## Architektur
 
-- **Manuelles DI** über `ServiceLocator` ([App.kt](app/src/main/java/ch/schreibwerkstatt/mobile/App.kt)) — kein Hilt. App-weite Singletons (Settings, Token, Network, DB, Repository, BundleManager) lazy; ViewModels ziehen Abhängigkeiten über `context.locator` + eigene `factory`.
+- **Manuelles DI** über `ServiceLocator` ([App.kt](app/src/main/java/ch/schreibwerkstatt/mobile/App.kt)) — kein Hilt. App-weite Singletons (Settings, Token, Network, DB, Repository, BundleManager, SyncCoordinator) lazy; ViewModels ziehen Abhängigkeiten über `context.locator` + eigene `factory`.
 - **UI:** Jetpack Compose + Material3, Navigation-Compose ([ui/AppNav.kt](app/src/main/java/ch/schreibwerkstatt/mobile/ui/AppNav.kt)). MVVM: `ui/<feature>/{Screen,ViewModel}.kt`. Screens: `pairing`, `books`, `tree`, `editor`, `settings`.
 - **Persistenz:** Room (`data/db/`) als Offline-Cache; DataStore (`data/prefs/SettingsStore`) für nicht-geheime Config; EncryptedSharedPreferences (`data/prefs/TokenStore`) für das Geräte-Token.
 - **Netzwerk:** Retrofit + OkHttp + kotlinx.serialization (`data/net/`). `NetworkClient` baut Retrofit pro (variabler) Basis-URL und cached es. DTOs in `data/net/dto/Dtos.kt`.
 - **Editor:** Der Focus-Editor läuft als Web-Bundle in einer WebView (`editor/`, `bundle/`, `assets/editor-host/host.html`) — siehe Harte Regeln unten.
+- **Sync-Trigger:** Der [`SyncCoordinator`](app/src/main/java/ch/schreibwerkstatt/mobile/data/repo/SyncCoordinator.kt) (App-Scope) bündelt alle Auslöser: Auto-**Flush** bei Connectivity-Wechsel, manueller Voll-Sync (`syncAllNow` → `ContentRepository.syncAllBooks`, Push + Pull aller Bücher), und Registrierung des periodischen Background-**Pulls**. Letzterer ist der [`PeriodicSyncWorker`](app/src/main/java/ch/schreibwerkstatt/mobile/sync/PeriodicSyncWorker.kt) (WorkManager, **stündlich**, `NetworkType.CONNECTED`); er no-opt ohne Token und ist über das Settings-Flag `backgroundSync` (Default an) abschaltbar. Zusätzlich pullt das `TreeViewModel` beim Buch-Öffnen. WorkManager nutzt seine Default-Initialisierung (androidx.startup) — keine eigene `Configuration`.
 
 ## Harte Regeln
 

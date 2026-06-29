@@ -101,14 +101,14 @@ class OfflineQueueDaoTest {
             PageEntity(id = 10, bookId = 1, name = "S", html = "<p>old</p>", updatedAt = "t0", dirty = false)
         )
 
-        pages.updateHtml(10, "<p>local</p>", dirty = true)
+        pages.updateHtml(10, "<p>local</p>", plain = "local", dirty = true)
         pages.byId(10)!!.let {
             assertTrue(it.dirty)
             assertEquals("<p>local</p>", it.html)
             assertEquals("t0", it.updatedAt) // updateHtml lässt den Server-Stand unberührt
         }
 
-        pages.applyServerVersion(10, "<p>server</p>", "t1", "S2")
+        pages.applyServerVersion(10, "<p>server</p>", "server", "t1", "S2")
         pages.byId(10)!!.let {
             assertFalse(it.dirty)
             assertEquals("<p>server</p>", it.html)

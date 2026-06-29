@@ -2,6 +2,7 @@ package ch.schreibwerkstatt.mobile.data.repo
 
 import ch.schreibwerkstatt.mobile.data.db.AppDatabase
 import ch.schreibwerkstatt.mobile.data.db.BookEntity
+import ch.schreibwerkstatt.mobile.data.db.PageContentHit
 import ch.schreibwerkstatt.mobile.data.db.PageEntity
 import ch.schreibwerkstatt.mobile.data.db.PendingWriteEntity
 import ch.schreibwerkstatt.mobile.data.net.DevicePingRequest
@@ -13,6 +14,7 @@ import ch.schreibwerkstatt.mobile.data.net.dto.CreateChapterRequest
 import ch.schreibwerkstatt.mobile.data.net.dto.CreatePageRequest
 import ch.schreibwerkstatt.mobile.data.net.dto.PageConflictDto
 import ch.schreibwerkstatt.mobile.data.net.dto.PageLockedDto
+import ch.schreibwerkstatt.mobile.data.net.dto.RevisionDto
 import ch.schreibwerkstatt.mobile.data.net.dto.SavePageRequest
 import ch.schreibwerkstatt.mobile.data.net.dto.TreeDto
 import ch.schreibwerkstatt.mobile.data.net.dto.TreePageDto
@@ -159,6 +161,30 @@ class ContentRepository(
     fun observePages(bookId: Long): Flow<List<PageEntity>> = db.pageDao().observeForBook(bookId)
 
     /**
+     * Lokale Volltextsuche im **Inhalt** der Seiten eines Buchs (Room-FTS über den
+     * gestrippten Klartext). Deckt die Seiten ab, die der Delta-Pull bereits gecacht
+     * hat — beim Betreten des Baums wird das ganze Buch gepullt, also typischerweise
+     * vollständig. Leere/zeichenlose Query → keine Treffer.
+     */
+    suspend fun searchPageContent(bookId: Long, query: String): List<PageContentHit> {
+        val match = toFtsMatch(query) ?: return emptyList()
+        return db.pageDao().searchContent(bookId, match)
+    }
+
+    /**
+     * Roh-Eingabe → FTS4-MATCH-Query: in Tokens zerlegen, Nicht-Alphanumerisches
+     * (auch FTS-Sonderzeichen) entfernen und je Token Präfix-Match (`token*`)
+     * UND-verknüpfen. Liefert null, wenn nichts Durchsuchbares übrig bleibt.
+     */
+    private fun toFtsMatch(raw: String): String? {
+        val tokens = raw.trim().split(WHITESPACE_RE)
+            .map { token -> token.filter(Char::isLetterOrDigit) }
+            .filter { it.isNotEmpty() }
+        if (tokens.isEmpty()) return null
+        return tokens.joinToString(" ") { "$it*" }
+    }
+
+    /**
      * Seite für den Editor laden. Reihenfolge:
      * 1. **Lokal-dirty** → immer der Cache: der Pending-Write hat Vorrang und darf
      *    nie mit Server-Stand überschrieben werden (siehe Offline-first-Regel).
@@ -184,6 +210,7 @@ class ContentRepository(
             chapterId = dto.chapter_id,
             name = dto.name,
             html = dto.html,
+            plain = HtmlText.toPlain(dto.html),
             updatedAt = dto.updated_at,
             dirty = false,
         )
@@ -203,7 +230,7 @@ class ContentRepository(
         // expected_updated_at mit, damit der Server einen Fremd-Save als 409 erkennt.
         val baseUpdatedAt = db.pageDao().byId(pageId)?.updatedAt
         // 1) Lokal persistieren (dirty) + Queue konsolidieren.
-        db.pageDao().updateHtml(pageId, html, dirty = true)
+        db.pageDao().updateHtml(pageId, html, HtmlText.toPlain(html), dirty = true)
         db.pendingWriteDao().deletePendingForPage(pageId)
         val localId = db.pendingWriteDao().insert(
             PendingWriteEntity(
@@ -239,7 +266,8 @@ class ContentRepository(
         return when {
             resp.isSuccessful -> {
                 val dto = resp.body()
-                db.pageDao().applyServerVersion(pageId, dto?.html ?: html, dto?.updated_at, dto?.name)
+                val serverHtml = dto?.html ?: html
+                db.pageDao().applyServerVersion(pageId, serverHtml, HtmlText.toPlain(serverHtml), dto?.updated_at, dto?.name)
                 db.pendingWriteDao().delete(localId)
                 SaveResult.Saved(db.pageDao().byId(pageId)!!)
             }
@@ -268,13 +296,52 @@ class ContentRepository(
     }
 
     /**
+     * Noch nicht aufgelöster Konflikt-Pending-Write der Seite (Status `conflict`),
+     * sonst null. Der Editor macht damit beim Wiederöffnen einen beim letzten Save
+     * aufgetretenen 409 erneut sichtbar — sonst bliebe die dirty-Seite stumm auf dem
+     * lokalen Stand hängen (`loadPage` liefert dirty immer aus dem Cache, der
+     * Sync-Pull überspringt dirty, und `flushPending` retryt nur `pending`).
+     */
+    suspend fun openConflict(pageId: Long): PendingWriteEntity? =
+        db.pendingWriteDao().latestForPage(pageId)
+            ?.takeIf { it.status == PendingWriteEntity.STATUS_CONFLICT }
+
+    /**
      * Konflikt auflösen: Server-Version laden und lokal übernehmen (lokale
      * Änderung verwerfen). Für v1 die einfache „Server gewinnt"-Variante.
      */
     suspend fun resolveWithServerVersion(pageId: Long, bookId: Long): Result<PageEntity> = runCatching {
         val dto = net.content(baseUrl()).page(pageId)
-        db.pageDao().applyServerVersion(pageId, dto.html, dto.updated_at, dto.name)
+        db.pageDao().applyServerVersion(pageId, dto.html, HtmlText.toPlain(dto.html), dto.updated_at, dto.name)
         // Konflikt-/Pending-Writes der Seite verwerfen.
+        db.pendingWriteDao().latestForPage(pageId)?.let { db.pendingWriteDao().delete(it.localId) }
+        db.pageDao().byId(pageId)!!
+    }
+
+    // ── Seiten-Versionen (Revisions) ─────────────────────────────────────────
+
+    /** Versionsliste einer Seite (Metadaten, ohne HTML-Body). */
+    suspend fun pageRevisions(pageId: Long): Result<List<RevisionDto>> = runCatching {
+        net.content(baseUrl()).revisions(pageId).revisions
+    }
+
+    /** Eine einzelne Revision inkl. vollem `body_html` (für die Vorschau). */
+    suspend fun pageRevision(pageId: Long, revId: Long): Result<RevisionDto> = runCatching {
+        net.content(baseUrl()).revision(pageId, revId).revision
+            ?: error("Revision $revId nicht gefunden")
+    }
+
+    /**
+     * Seite auf eine frühere Revision zurücksetzen. Der Server legt dabei eine neue
+     * `main`-Revision an; danach holen wir den frischen Seitenstand und übernehmen ihn
+     * in den lokalen Cache (und verwerfen evtl. Pending-Writes — „Server gewinnt").
+     */
+    suspend fun restoreRevision(pageId: Long, revId: Long, bookId: Long): Result<PageEntity> = runCatching {
+        val api = net.content(baseUrl())
+        val resp = api.restoreRevision(pageId, revId)
+        if (!resp.isSuccessful) error("restore HTTP ${resp.code()}")
+        val dto = api.page(pageId)
+        db.pageDao().applyServerVersion(pageId, dto.html, HtmlText.toPlain(dto.html), dto.updated_at, dto.name)
         db.pendingWriteDao().latestForPage(pageId)?.let { db.pendingWriteDao().delete(it.localId) }
         db.pageDao().byId(pageId)!!
     }
@@ -282,6 +349,24 @@ class ContentRepository(
     // ── Sync (Delegation) ────────────────────────────────────────────────────
 
     suspend fun syncBook(bookId: Long): Result<Unit> = sync.pullBook(bookId, ::baseUrl)
+
+    /**
+     * Voll-Sync über alle bekannten Bücher (für den periodischen Background-Pull
+     * und „Jetzt synchronisieren"): erst die Pending-Queue flushen (Push), dann die
+     * Buchliste auffrischen und für jedes Buch den Delta-Pull fahren. Delta-Pull ist
+     * dirty-sicher (siehe [SyncEngine]) — lokale Pending-Writes bleiben unangetastet.
+     * Schlägt ein Buch fehl, läuft der Rest trotzdem; der erste Fehler wird am Ende
+     * als `Result.failure` gemeldet (für WorkManager-Retry).
+     */
+    suspend fun syncAllBooks(): Result<Unit> = runCatching {
+        flushPending()
+        refreshBooks().getOrThrow()
+        var firstError: Throwable? = null
+        for (book in db.bookDao().all()) {
+            syncBook(book.id).onFailure { if (firstError == null) firstError = it }
+        }
+        firstError?.let { throw it }
+    }
 
     suspend fun flushPending(): Result<Int> = sync.flushPending(::flushOne)
 
@@ -312,6 +397,7 @@ private fun BookDto.toEntity() = BookEntity(
 /** `buchtyp`-Wert für Tagebuch-Bücher (Server-Schema). */
 const val BUCHTYP_TAGEBUCH = "tagebuch"
 
+private val WHITESPACE_RE = Regex("""\s+""")
 private val DIARY_DATE_RE = Regex("""\d{4}-\d{2}-\d{2}""")
 private val DIARY_DATE_PREFIX_RE = Regex("""^(\d{4}-\d{2}-\d{2})\b""")
 

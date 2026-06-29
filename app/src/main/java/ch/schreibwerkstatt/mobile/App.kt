@@ -36,7 +36,7 @@ class ServiceLocator(context: Context) {
     val bundleManager: BundleManager by lazy { BundleManager(appContext, tokenStore) }
     val connectivity: ConnectivityObserver by lazy { ConnectivityObserver(appContext) }
     val syncCoordinator: SyncCoordinator by lazy {
-        SyncCoordinator(repository, connectivity, tokenStore, applicationScope)
+        SyncCoordinator(appContext, repository, connectivity, tokenStore, settings, applicationScope)
     }
     val updateManager: UpdateManager by lazy { UpdateManager(appContext, applicationScope) }
 

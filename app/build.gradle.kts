@@ -127,6 +127,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.webkit)
     implementation(libs.androidx.browser)

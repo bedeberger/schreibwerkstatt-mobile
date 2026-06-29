@@ -6,6 +6,8 @@ import ch.schreibwerkstatt.mobile.data.db.PendingWriteEntity
 import ch.schreibwerkstatt.mobile.data.db.SyncCursorEntity
 import ch.schreibwerkstatt.mobile.data.net.NetworkClient
 import ch.schreibwerkstatt.mobile.data.prefs.SettingsStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Delta-Pull (`GET /content/books/:id/sync`) + Flush der Pending-Write-Queue.
@@ -30,21 +32,27 @@ class SyncEngine(
             val resp = api.sync(bookId, since, sinceId, limit = 200)
             nowIso = resp.now
             if (resp.pages.isNotEmpty()) {
-                db.pageDao().upsertAll(resp.pages.mapNotNull { p ->
-                    // Lokal-dirty Seiten nicht mit Server-Stand überschreiben —
-                    // der Pending-Write hat Vorrang bis zum Flush/Konflikt.
-                    val local = db.pageDao().byId(p.page_id)
-                    if (local?.dirty == true) return@mapNotNull null
-                    PageEntity(
-                        id = p.page_id,
-                        bookId = bookId,
-                        chapterId = p.chapter_id,
-                        name = p.page_name,
-                        html = p.html,
-                        updatedAt = p.updated_at,
-                        dirty = false,
-                    )
-                })
+                // HTML→Klartext-Strippen ist CPU-Arbeit → vom (oft Main-)Aufrufer-
+                // Dispatcher wegziehen, damit der Pull die UI nicht ruckeln lässt.
+                val entities = withContext(Dispatchers.Default) {
+                    resp.pages.mapNotNull { p ->
+                        // Lokal-dirty Seiten nicht mit Server-Stand überschreiben —
+                        // der Pending-Write hat Vorrang bis zum Flush/Konflikt.
+                        val local = db.pageDao().byId(p.page_id)
+                        if (local?.dirty == true) return@mapNotNull null
+                        PageEntity(
+                            id = p.page_id,
+                            bookId = bookId,
+                            chapterId = p.chapter_id,
+                            name = p.page_name,
+                            html = p.html,
+                            plain = HtmlText.toPlain(p.html),
+                            updatedAt = p.updated_at,
+                            dirty = false,
+                        )
+                    }
+                }
+                db.pageDao().upsertAll(entities)
             }
             // Cursor fortschreiben.
             resp.cursor?.let { c ->

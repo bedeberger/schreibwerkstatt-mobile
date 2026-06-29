@@ -37,9 +37,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.HorizontalRule
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.SyncProblem
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -64,8 +66,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlin.math.max
@@ -78,6 +89,8 @@ import androidx.webkit.WebViewAssetLoader
 import ch.schreibwerkstatt.mobile.R
 import ch.schreibwerkstatt.mobile.editor.EditorBridge
 import ch.schreibwerkstatt.mobile.locator
+import ch.schreibwerkstatt.mobile.ui.components.SkeletonParagraphs
+import ch.schreibwerkstatt.mobile.ui.components.pageFlipGestures
 import org.json.JSONObject
 
 private const val APP_ORIGIN = "https://appassets.androidplatform.net"
@@ -89,6 +102,8 @@ fun EditorScreen(
     pageId: Long,
     pageTitle: String,
     onBack: () -> Unit,
+    onOpenHistory: (pageId: Long, pageName: String) -> Unit,
+    onNavigateToPage: (pageId: Long, pageName: String) -> Unit,
 ) {
     val context = LocalContext.current
     val darkTheme = isSystemInDarkTheme()
@@ -128,6 +143,27 @@ fun EditorScreen(
                     }
                 },
                 actions = {
+                    // Dauerhafter Hinweis bei ungelöstem Konflikt: öffnet den Dialog erneut,
+                    // auch wenn er einmal weggetippt wurde (sonst klebt der lokale Stand).
+                    if (state.hasOpenConflict) {
+                        IconButton(onClick = vm::reopenConflict) {
+                            Icon(
+                                Icons.Filled.SyncProblem,
+                                contentDescription = stringResource(R.string.editor_conflict_indicator),
+                                tint = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                    // Versionsverlauf der Seite.
+                    IconButton(onClick = {
+                        evalJs("window.__sw && window.__sw.save();")
+                        onOpenHistory(pageId, pageTitle)
+                    }) {
+                        Icon(
+                            Icons.Filled.History,
+                            contentDescription = stringResource(R.string.history_title),
+                        )
+                    }
                     // Block-Formatierung in den eingebetteten Focus-Editor (host.html).
                     IconButton(onClick = { evalJs("window.__sw && window.__sw.insertHr();") }) {
                         Icon(
@@ -149,6 +185,8 @@ fun EditorScreen(
             if (state.sttEnabled) {
                 FloatingActionButton(onClick = {
                     if (state.transcribing) return@FloatingActionButton
+                    // Taktiles Feedback beim Diktat-Start/Stop, da der Schnitt sonst stumm bleibt.
+                    vibrateTick(context)
                     // Bereits erteilt → direkt toggeln (start/stop). Sonst Berechtigung
                     // anfragen; der Launcher-Callback startet bei Erfolg, sonst Hinweis.
                     val granted = ContextCompat.checkSelfPermission(
@@ -170,11 +208,23 @@ fun EditorScreen(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .pageFlipGestures(
+                    onPrev = state.prevPage?.let { p ->
+                        {
+                            evalJs("window.__sw && window.__sw.save();")
+                            onNavigateToPage(p.id, p.name)
+                        }
+                    },
+                    onNext = state.nextPage?.let { n ->
+                        {
+                            evalJs("window.__sw && window.__sw.save();")
+                            onNavigateToPage(n.id, n.name)
+                        }
+                    },
+                )
         ) {
             when (val b = state.bundle) {
-                is BundleState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+                is BundleState.Loading -> SkeletonParagraphs(Modifier.fillMaxSize())
                 is BundleState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.editor_bundle_error, b.message), color = MaterialTheme.colorScheme.error)
                 }
@@ -195,7 +245,10 @@ fun EditorScreen(
                 recording = state.recording,
                 transcribing = state.transcribing,
                 level = state.level,
-                onStop = { vm.toggleDictation { text -> insertText(evalJs, text) } },
+                onStop = {
+                    vibrateTick(context)
+                    vm.toggleDictation { text -> insertText(evalJs, text) }
+                },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 24.dp, start = 16.dp, end = 16.dp),
@@ -248,6 +301,21 @@ private fun insertText(evalJs: (String) -> Unit, text: String) {
 private fun jsString(value: String): String = JSONObject.quote(value)
 
 /**
+ * Kurzer, spürbarer Vibrations-Tick beim Diktat-Start/-Stop. Respektiert fehlende
+ * Hardware (kein Motor → no-op); die System-Haptik-Einstellung greift weiterhin.
+ */
+private fun vibrateTick(context: Context) {
+    val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
+    } else {
+        @Suppress("DEPRECATION")
+        context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+    }
+    if (!vibrator.hasVibrator()) return
+    vibrator.vibrate(VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE))
+}
+
+/**
  * Bodennahe Statusleiste während des Diktats. Beim Aufnehmen zeigt sie eine
  * lebendige Pegel-Anzeige (reagiert auf [level]) und „Höre zu …"; während der
  * Transkription einen Spinner. Tippen beendet die Aufnahme. Gleitet sanft ein
@@ -273,7 +341,22 @@ private fun DictationStatusBar(
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
             tonalElevation = 3.dp,
             shadowElevation = 6.dp,
-            modifier = if (recording) Modifier.clickable(onClick = onStop) else Modifier,
+            // Als Live-Region zusammengefasst: TalkBack sagt „Höre zu …" bzw.
+            // „Transkribiere …" an, sobald der Streifen erscheint. Beim Aufnehmen
+            // ist er antippbar zum Beenden (wie der FAB) – mit Aktionslabel & Rolle.
+            modifier = Modifier
+                .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }
+                .then(
+                    if (recording) {
+                        Modifier.clickable(
+                            onClickLabel = stringResource(R.string.editor_stop),
+                            role = Role.Button,
+                            onClick = onStop,
+                        )
+                    } else {
+                        Modifier
+                    }
+                ),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,

@@ -6,6 +6,14 @@
     <string name="search_clear">Suche löschen</string>
     <string name="search_no_results">Keine Treffer für „%1$s".</string>
 
+    <!-- Accessibility (Screenreader/TalkBack). Dekorative Icons bleiben bewusst
+         contentDescription=null; hier nur Labels für interaktive bzw. rein
+         visuell kodierte Elemente, die sonst stumm sind. -->
+    <string name="a11y_action_open">öffnen</string>
+    <string name="a11y_calendar_today">heute</string>
+    <string name="a11y_calendar_has_entry">Eintrag vorhanden</string>
+    <string name="a11y_calendar_no_entry">kein Eintrag</string>
+
     <!-- Pairing -->
     <string name="pairing_title">Gerät koppeln</string>
     <string name="pairing_server_label">Server-Adresse</string>
@@ -34,6 +42,43 @@
     <string name="settings_checking_update">Wird geprüft…</string>
     <string name="settings_up_to_date">Du verwendest bereits die neueste Version.</string>
 
+    <!-- Settings: Sektionen -->
+    <string name="settings_section_appearance">Darstellung</string>
+    <string name="settings_section_sync">Synchronisierung</string>
+    <string name="settings_section_account">Konto &amp; Gerät</string>
+    <string name="settings_section_about">Über die App</string>
+
+    <!-- Settings: Farbschema -->
+    <string name="settings_theme">Farbschema</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Hell</string>
+    <string name="settings_theme_dark">Dunkel</string>
+
+    <!-- Settings: Sync -->
+    <string name="settings_sync_status">Status</string>
+    <string name="settings_sync_online">Online</string>
+    <string name="settings_sync_offline">Offline</string>
+    <string name="settings_sync_all_synced">Alles synchronisiert</string>
+    <plurals name="settings_sync_pending">
+        <item quantity="one">%d Änderung wartet auf Synchronisierung</item>
+        <item quantity="other">%d Änderungen warten auf Synchronisierung</item>
+    </plurals>
+    <string name="settings_sync_now">Jetzt synchronisieren</string>
+    <string name="settings_sync_running">Synchronisiere…</string>
+    <string name="settings_background_sync">Hintergrund-Sync</string>
+    <string name="settings_background_sync_hint">Bücher stündlich automatisch im Hintergrund aktualisieren</string>
+
+    <!-- Settings: Diagnose -->
+    <string name="settings_diagnostics">Diagnose-Infos teilen</string>
+    <string name="settings_diagnostics_subject">Schreibwerkstatt – Diagnose</string>
+    <string name="settings_diagnostics_chooser">Diagnose teilen</string>
+
+    <!-- Settings: Abmelde-Bestätigung -->
+    <string name="settings_signout_confirm_title">Gerät abmelden?</string>
+    <string name="settings_signout_confirm_message">Das lokale Token wird von diesem Gerät entfernt. Noch nicht synchronisierte Änderungen können verloren gehen. Fortfahren?</string>
+    <string name="settings_signout_confirm">Abmelden</string>
+    <string name="action_cancel">Abbrechen</string>
+
     <!-- Update-Dialog -->
     <string name="update_available_title">Update verfügbar</string>
     <string name="update_available_message">Version %1$s ist verfügbar. Jetzt herunterladen und installieren?</string>
@@ -49,10 +94,27 @@
     <string name="action_retry">Erneut versuchen</string>
 
     <!-- Tree (Kapitel-/Seitenbaum) -->
-    <string name="tree_search_hint">Seite suchen</string>
+    <string name="tree_search_hint">Seite oder Inhalt suchen</string>
     <string name="tree_page_updated">Zuletzt geändert: %1$s</string>
     <string name="tree_page_updated_unknown">Noch nicht synchronisiert</string>
     <string name="tree_load_error">Fehler beim Laden: %1$s</string>
+    <string name="history_title">Verlauf</string>
+    <string name="history_empty">Noch keine früheren Versionen vorhanden.</string>
+    <string name="history_load_error">Fehler beim Laden des Verlaufs: %1$s</string>
+    <string name="history_action_error">Aktion fehlgeschlagen: %1$s</string>
+    <string name="history_words">%1$d Wörter</string>
+    <string name="history_restore">Wiederherstellen</string>
+    <string name="history_restore_confirm_title">Version wiederherstellen?</string>
+    <string name="history_restore_confirm_message">Der aktuelle Seiteninhalt wird durch diese Version ersetzt. Der bisherige Stand bleibt als neue Version im Verlauf erhalten.</string>
+    <string name="history_source_focus">Focus-Editor</string>
+    <string name="history_source_main">Editor</string>
+    <string name="history_source_macapp">Mac-App</string>
+    <string name="history_source_chat">Chat</string>
+    <string name="history_source_lektorat">Lektorat</string>
+    <string name="history_source_import">Import</string>
+    <string name="history_source_conflict">Konflikt</string>
+    <string name="history_source_sync">Synchronisierung</string>
+    <string name="history_source_unknown">Unbekannt</string>
 
     <!-- Tagebuch / Kalender -->
     <string name="calendar_show">Kalender anzeigen</string>
@@ -74,6 +136,7 @@
     <string name="editor_conflict_unknown_time">unbekannt</string>
     <string name="editor_conflict_load_server">Server-Version laden</string>
     <string name="editor_conflict_keep_local">Lokale behalten</string>
+    <string name="editor_conflict_indicator">Ungelöster Konflikt – Server-Version laden</string>
     <string name="editor_mic_denied">Mikrofon-Berechtigung fehlt. Bitte in den App-Einstellungen erlauben, um zu diktieren.</string>
     <string name="editor_listening">Höre zu …</string>
     <string name="editor_listening_hint">Tippen zum Beenden</string>

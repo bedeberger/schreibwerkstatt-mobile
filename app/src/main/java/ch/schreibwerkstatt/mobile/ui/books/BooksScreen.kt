@@ -1,5 +1,6 @@
 package ch.schreibwerkstatt.mobile.ui.books
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,6 +48,7 @@ import ch.schreibwerkstatt.mobile.R
 import ch.schreibwerkstatt.mobile.data.db.BookEntity
 import ch.schreibwerkstatt.mobile.locator
 import ch.schreibwerkstatt.mobile.ui.components.SearchField
+import ch.schreibwerkstatt.mobile.ui.components.SkeletonList
 import ch.schreibwerkstatt.mobile.ui.components.SyncStatusBar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -85,7 +88,7 @@ fun BooksScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            Column {
+            Column(Modifier.background(MaterialTheme.colorScheme.surface)) {
                 TopAppBar(
                     title = { Text(stringResource(R.string.books_title)) },
                     actions = {
@@ -113,7 +116,9 @@ fun BooksScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            if (books.isEmpty() && !refreshing) {
+            if (books.isEmpty() && refreshing) {
+                SkeletonList(Modifier.fillMaxSize())
+            } else if (books.isEmpty()) {
                 Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -158,7 +163,10 @@ fun BooksScreen(
                             leadingContent = {
                                 Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null)
                             },
-                            modifier = Modifier.clickable { onOpenBook(book) },
+                            modifier = Modifier.clickable(
+                                onClickLabel = stringResource(R.string.a11y_action_open),
+                                role = Role.Button,
+                            ) { onOpenBook(book) },
                         )
                         HorizontalDivider()
                     }

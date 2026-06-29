@@ -6,6 +6,9 @@ import ch.schreibwerkstatt.mobile.data.net.dto.ConfigDto
 import ch.schreibwerkstatt.mobile.data.net.dto.CreateChapterRequest
 import ch.schreibwerkstatt.mobile.data.net.dto.CreatePageRequest
 import ch.schreibwerkstatt.mobile.data.net.dto.PageDto
+import ch.schreibwerkstatt.mobile.data.net.dto.RestoreResponse
+import ch.schreibwerkstatt.mobile.data.net.dto.RevisionDetailResponse
+import ch.schreibwerkstatt.mobile.data.net.dto.RevisionListResponse
 import ch.schreibwerkstatt.mobile.data.net.dto.SavePageRequest
 import ch.schreibwerkstatt.mobile.data.net.dto.SyncResponse
 import ch.schreibwerkstatt.mobile.data.net.dto.TranscribeResponse
@@ -64,6 +67,27 @@ interface ContentApi {
         @Path("bookId") bookId: Long,
         @Body body: DevicePingRequest,
     ): Response<Unit>
+
+    /** Versionsliste einer Seite (ohne `body_html`, nur Metadaten). */
+    @GET("content/pages/{pageId}/revisions")
+    suspend fun revisions(
+        @Path("pageId") pageId: Long,
+        @Query("limit") limit: Int = 100,
+    ): RevisionListResponse
+
+    /** Einzelne Revision inkl. vollem `body_html` (für die Vorschau). */
+    @GET("content/pages/{pageId}/revisions/{revId}")
+    suspend fun revision(
+        @Path("pageId") pageId: Long,
+        @Path("revId") revId: Long,
+    ): RevisionDetailResponse
+
+    /** Seite auf eine frühere Revision zurücksetzen (legt eine neue Revision an). */
+    @POST("content/pages/{pageId}/revisions/{revId}/restore")
+    suspend fun restoreRevision(
+        @Path("pageId") pageId: Long,
+        @Path("revId") revId: Long,
+    ): Response<RestoreResponse>
 }
 
 @kotlinx.serialization.Serializable

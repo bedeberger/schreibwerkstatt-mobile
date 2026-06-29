@@ -4,7 +4,13 @@ import ch.schreibwerkstatt.mobile.data.net.ContentApi
 import ch.schreibwerkstatt.mobile.data.net.DevicePingRequest
 import ch.schreibwerkstatt.mobile.data.net.NetworkClient
 import ch.schreibwerkstatt.mobile.data.net.dto.BookDto
+import ch.schreibwerkstatt.mobile.data.net.dto.ChapterNodeDto
+import ch.schreibwerkstatt.mobile.data.net.dto.CreateChapterRequest
+import ch.schreibwerkstatt.mobile.data.net.dto.CreatePageRequest
 import ch.schreibwerkstatt.mobile.data.net.dto.PageDto
+import ch.schreibwerkstatt.mobile.data.net.dto.RestoreResponse
+import ch.schreibwerkstatt.mobile.data.net.dto.RevisionDetailResponse
+import ch.schreibwerkstatt.mobile.data.net.dto.RevisionListResponse
 import ch.schreibwerkstatt.mobile.data.net.dto.SavePageRequest
 import ch.schreibwerkstatt.mobile.data.net.dto.SyncResponse
 import ch.schreibwerkstatt.mobile.data.net.dto.TreeDto
@@ -54,6 +60,21 @@ class FakeContentApi : ContentApi {
 
     override suspend fun devicePing(bookId: Long, body: DevicePingRequest): Response<Unit> =
         Response.success(Unit)
+
+    override suspend fun createPage(body: CreatePageRequest): Response<PageDto> =
+        throw NotImplementedError()
+
+    override suspend fun createChapter(body: CreateChapterRequest): Response<ChapterNodeDto> =
+        throw NotImplementedError()
+
+    override suspend fun revisions(pageId: Long, limit: Int): RevisionListResponse =
+        throw NotImplementedError()
+
+    override suspend fun revision(pageId: Long, revId: Long): RevisionDetailResponse =
+        throw NotImplementedError()
+
+    override suspend fun restoreRevision(pageId: Long, revId: Long): Response<RestoreResponse> =
+        throw NotImplementedError()
 
     companion object {
         private val JSON = "application/json".toMediaType()

@@ -6,12 +6,15 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import ch.schreibwerkstatt.mobile.ServiceLocator
+import ch.schreibwerkstatt.mobile.data.db.PageContentHit
 import ch.schreibwerkstatt.mobile.data.net.dto.ChapterNodeDto
 import ch.schreibwerkstatt.mobile.data.net.dto.TreeDto
 import ch.schreibwerkstatt.mobile.data.repo.BUCHTYP_TAGEBUCH
 import ch.schreibwerkstatt.mobile.data.repo.ContentRepository
 import ch.schreibwerkstatt.mobile.data.repo.SyncCoordinator
 import ch.schreibwerkstatt.mobile.data.repo.diaryDateOf
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,6 +35,8 @@ data class TreeUiState(
     /** Server-`updated_at` (ISO-8601) je Seite aus dem lokalen Cache; Quelle für „zuletzt geändert". */
     val pageUpdatedAt: Map<Long, String?> = emptyMap(),
     val loading: Boolean = true,
+    /** true, während ein Pull-to-Refresh (Delta-Pull + Baum-Neuladen) läuft. */
+    val refreshing: Boolean = false,
     val error: String? = null,
     /** true = Buch ist ein Tagebuch (`buchtyp='tagebuch'`) → Kalender-Modus verfügbar. */
     val isDiary: Boolean = false,
@@ -45,6 +50,8 @@ data class TreeUiState(
     val creatingEntry: Boolean = false,
     /** Einmalige Fehlermeldung (Snackbar); nach Anzeige via [TreeViewModel.consumeMessage] löschen. */
     val message: String? = null,
+    /** Treffer der Inhalts-Volltextsuche zur aktuellen Query (leer = keine/inaktiv). */
+    val contentHits: List<PageContentHit> = emptyList(),
 )
 
 class TreeViewModel(
@@ -89,18 +96,55 @@ class TreeViewModel(
     fun load() {
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
-            repo.tree(bookId)
-                .onSuccess { tree ->
-                    val rows = flatten(tree)
-                    _state.update {
-                        it.copy(
-                            rows = rows,
-                            diaryEntries = diaryEntriesOf(rows),
-                            loading = false,
-                        )
-                    }
+            fetchTree()
+            _state.update { it.copy(loading = false) }
+        }
+    }
+
+    /**
+     * Pull-to-Refresh: erst den Offline-Cache per Delta-Pull auffrischen, dann den
+     * Baum neu laden. Eigener [TreeUiState.refreshing]-Indikator (statt [loading]),
+     * damit das Skeleton nicht erneut aufblitzt, während Inhalt schon sichtbar ist.
+     */
+    fun refresh() {
+        viewModelScope.launch {
+            _state.update { it.copy(refreshing = true) }
+            repo.syncBook(bookId)
+            fetchTree()
+            _state.update { it.copy(refreshing = false) }
+        }
+    }
+
+    /** Baum vom Repository holen und Zeilen/Tagebuch-Einträge im State aktualisieren. */
+    private suspend fun fetchTree() {
+        repo.tree(bookId)
+            .onSuccess { tree ->
+                val rows = flattenTree(tree)
+                _state.update {
+                    it.copy(rows = rows, diaryEntries = diaryEntriesOf(rows), error = null)
                 }
-                .onFailure { _state.value = _state.value.copy(error = it.message, loading = false) }
+            }
+            .onFailure { e -> _state.update { it.copy(error = e.message) } }
+    }
+
+    private var searchJob: Job? = null
+
+    /**
+     * Inhalts-Volltextsuche zur aktuellen Such-Query (debounced). Die Titel-Filterung
+     * läuft weiterhin sofort im UI über die bereits geladenen Zeilen; diese Suche
+     * ergänzt nur die Treffer im Seiten-*Inhalt* aus dem Room-FTS-Index.
+     */
+    fun search(query: String) {
+        searchJob?.cancel()
+        val q = query.trim()
+        if (q.isEmpty()) {
+            if (_state.value.contentHits.isNotEmpty()) _state.update { it.copy(contentHits = emptyList()) }
+            return
+        }
+        searchJob = viewModelScope.launch {
+            delay(200) // Debounce gegen Tippen
+            val hits = repo.searchPageContent(bookId, q)
+            _state.update { it.copy(contentHits = hits) }
         }
     }
 
@@ -143,41 +187,46 @@ class TreeViewModel(
         return out
     }
 
-    private fun flatten(tree: TreeDto): List<TreeRow> {
-        val rows = mutableListOf<TreeRow>()
-        tree.topPages.forEach { rows += TreeRow.Page(it.id, it.name, depth = 0) }
-        // Der Server liefert Kapitel je nach Pfad in zwei Formen: verschachtelt
-        // (Unterkapitel in `subchapters`) ODER flach (alle Kapitel in `chapters`,
-        // Hierarchie nur über `parent_chapter_id`). Beide hier vereinheitlichen:
-        // flache Kinder über parent_chapter_id den Wurzelkapiteln zuordnen, damit
-        // die `walk`-Rekursion in jedem Fall die volle Tiefe ausgibt.
-        val ids = tree.chapters.map { it.id }.toSet()
-        val childrenOf = tree.chapters
-            .filter { it.parent_chapter_id != null && it.parent_chapter_id in ids }
-            .groupBy { it.parent_chapter_id!! }
-        tree.chapters
-            .filter { it.parent_chapter_id == null || it.parent_chapter_id !in ids }
-            .forEach { walk(it, depth = 0, into = rows, childrenOf = childrenOf) }
-        return rows
-    }
-
-    private fun walk(
-        chapter: ChapterNodeDto,
-        depth: Int,
-        into: MutableList<TreeRow>,
-        childrenOf: Map<Long, List<ChapterNodeDto>>,
-    ) {
-        into += TreeRow.Chapter(chapter.name, depth)
-        chapter.pages.forEach { into += TreeRow.Page(it.id, it.name, depth + 1) }
-        // Verschachtelte Form: Unterkapitel hängen direkt am Knoten.
-        chapter.subchapters.forEach { walk(it, depth + 1, into, childrenOf) }
-        // Flache Form: Unterkapitel referenzieren diesen Knoten per parent_chapter_id.
-        childrenOf[chapter.id]?.forEach { walk(it, depth + 1, into, childrenOf) }
-    }
-
     companion object {
         fun factory(locator: ServiceLocator, bookId: Long): ViewModelProvider.Factory = viewModelFactory {
             initializer { TreeViewModel(locator.repository, locator.syncCoordinator, bookId) }
         }
     }
+}
+
+/**
+ * Flacht den [TreeDto] in die angezeigte Zeilenreihenfolge (Kapitel + Seiten mit
+ * Tiefe). Top-Level, damit auch der Editor diese Reihenfolge nutzen kann (Wisch
+ * zur vorigen/nächsten Seite). Vereinheitlicht die zwei Server-Formen: verschachtelt
+ * (`subchapters`) ODER flach (Hierarchie nur über `parent_chapter_id`).
+ */
+fun flattenTree(tree: TreeDto): List<TreeRow> {
+    val rows = mutableListOf<TreeRow>()
+    tree.topPages.forEach { rows += TreeRow.Page(it.id, it.name, depth = 0) }
+    val ids = tree.chapters.map { it.id }.toSet()
+    val childrenOf = tree.chapters
+        .filter { it.parent_chapter_id != null && it.parent_chapter_id in ids }
+        .groupBy { it.parent_chapter_id!! }
+    tree.chapters
+        .filter { it.parent_chapter_id == null || it.parent_chapter_id !in ids }
+        .forEach { walk(it, depth = 0, into = rows, childrenOf = childrenOf) }
+    return rows
+}
+
+/** Nur die Seiten des Baums in Anzeige-Reihenfolge (für Vor/Zurück-Navigation). */
+fun orderedPages(tree: TreeDto): List<TreeRow.Page> =
+    flattenTree(tree).filterIsInstance<TreeRow.Page>()
+
+private fun walk(
+    chapter: ChapterNodeDto,
+    depth: Int,
+    into: MutableList<TreeRow>,
+    childrenOf: Map<Long, List<ChapterNodeDto>>,
+) {
+    into += TreeRow.Chapter(chapter.name, depth)
+    chapter.pages.forEach { into += TreeRow.Page(it.id, it.name, depth + 1) }
+    // Verschachtelte Form: Unterkapitel hängen direkt am Knoten.
+    chapter.subchapters.forEach { walk(it, depth + 1, into, childrenOf) }
+    // Flache Form: Unterkapitel referenzieren diesen Knoten per parent_chapter_id.
+    childrenOf[chapter.id]?.forEach { walk(it, depth + 1, into, childrenOf) }
 }

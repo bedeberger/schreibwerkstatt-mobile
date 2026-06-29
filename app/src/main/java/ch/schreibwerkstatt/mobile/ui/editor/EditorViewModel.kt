@@ -13,6 +13,7 @@ import ch.schreibwerkstatt.mobile.data.prefs.SettingsStore
 import ch.schreibwerkstatt.mobile.data.repo.ContentRepository
 import ch.schreibwerkstatt.mobile.editor.EditorBridge
 import ch.schreibwerkstatt.mobile.editor.EditorEvent
+import ch.schreibwerkstatt.mobile.ui.tree.orderedPages
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -28,6 +29,9 @@ sealed interface BundleState {
     data class Error(val message: String) : BundleState
 }
 
+/** Nachbarseite (für die Wisch-Navigation vor/zurück). */
+data class PageRef(val id: Long, val name: String)
+
 data class EditorUiState(
     val bundle: BundleState = BundleState.Loading,
     val sttEnabled: Boolean = false,
@@ -37,6 +41,16 @@ data class EditorUiState(
     val level: Float = 0f,
     val snackbar: String? = null,
     val conflict: EditorEvent.Conflict? = null,
+    /**
+     * Es existiert ein noch nicht aufgelöster Konflikt für diese Seite – auch wenn
+     * der Dialog gerade weggetippt ist. Treibt den dauerhaften Topbar-Hinweis,
+     * damit ein „klebender" lokaler Stand nicht unbemerkt bleibt.
+     */
+    val hasOpenConflict: Boolean = false,
+    /** Vorige Seite im Buch (Wisch nach rechts); null = keine. */
+    val prevPage: PageRef? = null,
+    /** Nächste Seite im Buch (Wisch nach links); null = keine. */
+    val nextPage: PageRef? = null,
 )
 
 class EditorViewModel(
@@ -52,6 +66,9 @@ class EditorViewModel(
     private val _state = MutableStateFlow(EditorUiState())
     val state: StateFlow<EditorUiState> = _state.asStateFlow()
 
+    /** Zuletzt gesehener Konflikt – damit der Topbar-Hinweis den Dialog wieder öffnen kann. */
+    private var lastConflict: EditorEvent.Conflict? = null
+
     /** Läuft, solange ein Diktat-Segment auf eine Sprechpause überwacht wird. */
     private var monitorJob: Job? = null
 
@@ -59,6 +76,17 @@ class EditorViewModel(
     val bridgeScope: CoroutineScope get() = viewModelScope
 
     init {
+        // Beim Öffnen einen noch offenen Konflikt (409 beim letzten Save) erneut
+        // anzeigen – sonst klebt die dirty-Seite stumm auf dem lokalen Stand.
+        // Eigener Launch, damit der Hinweis nicht hinter dem Bundle-Download wartet.
+        viewModelScope.launch {
+            repo.openConflict(pageId)?.let { w ->
+                val c = EditorEvent.Conflict(w.note, null)
+                lastConflict = c
+                _state.value = _state.value.copy(conflict = c, hasOpenConflict = true)
+            }
+        }
+
         viewModelScope.launch {
             val base = settings.serverBaseUrlOnce()
             if (base == null) {
@@ -89,6 +117,20 @@ class EditorViewModel(
                 repo.devicePing(bookId, pageId)
             }
         }
+
+        // Nachbarseiten für die Wisch-Navigation aus dem Buchbaum bestimmen
+        // (best effort; offline/Fehler → keine Wisch-Navigation).
+        viewModelScope.launch {
+            repo.tree(bookId).onSuccess { tree ->
+                val pages = orderedPages(tree)
+                val idx = pages.indexOfFirst { it.id == pageId }
+                if (idx >= 0) {
+                    val prev = pages.getOrNull(idx - 1)?.let { PageRef(it.id, it.name) }
+                    val next = pages.getOrNull(idx + 1)?.let { PageRef(it.id, it.name) }
+                    _state.value = _state.value.copy(prevPage = prev, nextPage = next)
+                }
+            }
+        }
     }
 
     fun newBridge(evalJs: (String) -> Unit, darkTheme: Boolean): EditorBridge =
@@ -106,10 +148,14 @@ class EditorViewModel(
         _state.value = when (event) {
             is EditorEvent.Ready -> _state.value
             is EditorEvent.SavedOffline -> _state.value.copy(snackbar = "Offline gespeichert – wird später synchronisiert.")
-            is EditorEvent.Conflict -> _state.value.copy(
-                conflict = event,
-                snackbar = "Konflikt: ${event.serverEditorName ?: "jemand"} hat die Seite geändert.",
-            )
+            is EditorEvent.Conflict -> {
+                lastConflict = event
+                _state.value.copy(
+                    conflict = event,
+                    hasOpenConflict = true,
+                    snackbar = "Konflikt: ${event.serverEditorName ?: "jemand"} hat die Seite geändert.",
+                )
+            }
             is EditorEvent.Locked -> _state.value.copy(
                 snackbar = "Seite gesperrt durch ${event.lockedByEmail ?: "Lektorat"}.",
             )
@@ -197,8 +243,10 @@ class EditorViewModel(
         viewModelScope.launch {
             repo.resolveWithServerVersion(pageId, bookId)
                 .onSuccess { page ->
+                    lastConflict = null
                     _state.value = _state.value.copy(
                         conflict = null,
+                        hasOpenConflict = false,
                         snackbar = "Server-Version geladen – lokale Änderung verworfen.",
                     )
                     onApplied(page.html ?: "<p><br></p>")
@@ -207,7 +255,13 @@ class EditorViewModel(
         }
     }
 
+    /** Dialog schliessen, aber den offenen Konflikt-Hinweis (Topbar) bewusst behalten. */
     fun dismissConflict() { _state.value = _state.value.copy(conflict = null) }
+
+    /** Den weggetippten Konflikt-Dialog über den Topbar-Hinweis erneut öffnen. */
+    fun reopenConflict() {
+        lastConflict?.let { _state.value = _state.value.copy(conflict = it) }
+    }
 
     override fun onCleared() {
         monitorJob?.cancel()

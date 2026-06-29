@@ -9,10 +9,11 @@ import androidx.room.RoomDatabase
     entities = [
         BookEntity::class,
         PageEntity::class,
+        PageFtsEntity::class,
         SyncCursorEntity::class,
         PendingWriteEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

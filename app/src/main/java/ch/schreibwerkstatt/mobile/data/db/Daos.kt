@@ -12,6 +12,10 @@ interface BookDao {
     @Query("SELECT * FROM books ORDER BY name COLLATE NOCASE")
     fun observeAll(): Flow<List<BookEntity>>
 
+    /** One-Shot-Liste (z.B. für den periodischen Background-Sync über alle Bücher). */
+    @Query("SELECT * FROM books")
+    suspend fun all(): List<BookEntity>
+
     @Upsert
     suspend fun upsertAll(books: List<BookEntity>)
 
@@ -39,12 +43,36 @@ interface PageDao {
     @Upsert
     suspend fun upsert(page: PageEntity)
 
-    @Query("UPDATE pages SET html = :html, dirty = :dirty WHERE id = :id")
-    suspend fun updateHtml(id: Long, html: String, dirty: Boolean)
+    @Query("UPDATE pages SET html = :html, plain = :plain, dirty = :dirty WHERE id = :id")
+    suspend fun updateHtml(id: Long, html: String, plain: String?, dirty: Boolean)
 
-    @Query("UPDATE pages SET html = :html, updatedAt = :updatedAt, name = :name, dirty = 0 WHERE id = :id")
-    suspend fun applyServerVersion(id: Long, html: String?, updatedAt: String?, name: String?)
+    @Query("UPDATE pages SET html = :html, plain = :plain, updatedAt = :updatedAt, name = :name, dirty = 0 WHERE id = :id")
+    suspend fun applyServerVersion(id: Long, html: String?, plain: String?, updatedAt: String?, name: String?)
+
+    /**
+     * Volltextsuche im Seiteninhalt eines Buchs via FTS4 (`pages_fts` MATCH).
+     * Liefert pro Treffer einen markup-freien Snippet rund um die Fundstelle.
+     * `:match` ist eine fertige FTS-MATCH-Query (siehe ContentRepository).
+     */
+    @Query(
+        """
+        SELECT p.id AS id, p.name AS name,
+               snippet(pages_fts, '', '', '…', -1, 16) AS snippet
+        FROM pages_fts
+        JOIN pages p ON p.id = pages_fts.rowid
+        WHERE p.bookId = :bookId AND pages_fts MATCH :match
+        ORDER BY p.name COLLATE NOCASE
+        """
+    )
+    suspend fun searchContent(bookId: Long, match: String): List<PageContentHit>
 }
+
+/** Treffer der Inhalts-Volltextsuche: Seite + markup-freier Snippet der Fundstelle. */
+data class PageContentHit(
+    val id: Long,
+    val name: String?,
+    val snippet: String?,
+)
 
 @Dao
 interface SyncCursorDao {
