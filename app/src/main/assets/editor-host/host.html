@@ -30,6 +30,29 @@
       overflow-wrap: anywhere !important;
       word-break: normal;
     }
+    /* Checkbox-Listen (Android-Toolbar `insertChecklist`). Markup:
+       <ul class="todo"><li class="todo-item"><input type=checkbox>
+         <span class="todo-text">…</span></li></ul>
+       Das Bundle liefert dieses CSS nicht mit (page-view.css steht nicht in
+       CSS_FILES und ist auf `.page-content-view` gescoped, nicht auf den
+       Focus-Container) — daher hier app-eigen, auf `.focus-editor__content`
+       gescoped. Touch-Grössen direkt (Mobile-only). */
+    .focus-editor__content ul.todo {
+      list-style: none; padding-left: 0; margin: 0.4em 0;
+    }
+    .focus-editor__content ul.todo > li.todo-item {
+      display: flex; align-items: flex-start; gap: 0.6em; margin: 0.35em 0;
+    }
+    .focus-editor__content ul.todo > li.todo-item > input[type="checkbox"] {
+      width: 1.4em; height: 1.4em; margin-top: calc((1lh - 1.4em) / 2);
+      accent-color: var(--color-primary, #4b6); cursor: pointer; flex: 0 0 auto;
+    }
+    .focus-editor__content ul.todo > li.todo-item > .todo-text {
+      flex: 1 1 auto; min-width: 0;
+    }
+    .focus-editor__content ul.todo > li.todo-item > input[type="checkbox"]:checked + .todo-text {
+      text-decoration: line-through; color: var(--color-muted, #999);
+    }
     .sw-boot-error {
       font: 15px/1.5 system-ui, sans-serif; color: #b00020; padding: 24px;
     }
@@ -59,6 +82,50 @@
     (function () {
       const pending = new Map();
       let seq = 0;
+
+      // --- Block-Formatierung (native Android-Toolbar ruft window.__sw.insertHr /
+      // insertChecklist; Checkbox-Toggle + Enter-Handling via delegierte Listener
+      // unten). Alles app-eigen in host.html — nicht im OTA-Bundle, also nur im
+      // Android-Client sichtbar. Einfügen dispatcht `input` → die Standalone-
+      // Engine markiert dirty + autosaved über die Bridge/ContentRepository. ---
+      const activeEditor = () =>
+        document.querySelector('.focus-editor.is-active .focus-editor__content')
+          || document.querySelector('.focus-editor__content');
+
+      // Oberster Block-Vorfahr des Carets innerhalb des Editor-Containers.
+      function currentBlock(el) {
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0) return null;
+        let node = sel.getRangeAt(0).startContainer;
+        if (!el.contains(node)) return null;
+        if (node.nodeType === 3) node = node.parentNode;
+        while (node && node.parentNode && node.parentNode !== el) node = node.parentNode;
+        return node && node !== el && el.contains(node) ? node : null;
+      }
+
+      function placeCaret(node) {
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+
+      // Ein leeres Checkbox-Item (Markup identisch zum Notebook-Editor).
+      function makeTodoItem() {
+        const li = document.createElement('li');
+        li.className = 'todo-item';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        const span = document.createElement('span');
+        span.className = 'todo-text';
+        span.appendChild(document.createElement('br'));
+        li.appendChild(cb);
+        li.appendChild(span);
+        return { li, span };
+      }
+
       window.__sw = {
         nextId() { return 'r' + (++seq); },
         track(id) {
@@ -95,6 +162,50 @@
             el.dispatchEvent(new InputEvent('input', { bubbles: true }));
           } catch (e) { /* nicht-fatal */ }
         },
+        // Trennlinie (<hr>) hinter dem aktuellen Block einfügen + Schreib-Slot
+        // (<p>) dahinter. <hr> übersteht den Server-Cleaner (_STRUCTURAL_LEAF).
+        insertHr() {
+          try {
+            const el = activeEditor();
+            if (!el) return;
+            el.focus();
+            const hr = document.createElement('hr');
+            const p = document.createElement('p');
+            p.appendChild(document.createElement('br'));
+            const block = currentBlock(el);
+            if (block) {
+              block.insertAdjacentElement('afterend', hr);
+            } else {
+              el.appendChild(hr);
+            }
+            hr.insertAdjacentElement('afterend', p);
+            placeCaret(p);
+            el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+          } catch (e) { /* nicht-fatal */ }
+        },
+        // Checkbox-Liste einfügen. Leeren aktuellen Block ersetzen, sonst dahinter
+        // anhängen. Caret landet im Text-Slot des ersten Items.
+        insertChecklist() {
+          try {
+            const el = activeEditor();
+            if (!el) return;
+            el.focus();
+            const ul = document.createElement('ul');
+            ul.className = 'todo';
+            const { li, span } = makeTodoItem();
+            ul.appendChild(li);
+            const block = currentBlock(el);
+            if (block && !block.textContent.trim()) {
+              block.parentNode.replaceChild(ul, block);
+            } else if (block) {
+              block.insertAdjacentElement('afterend', ul);
+            } else {
+              el.appendChild(ul);
+            }
+            placeCaret(span);
+            el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+          } catch (e) { /* nicht-fatal */ }
+        },
         // Seite ohne Speichern austauschen (native Navigation).
         setPage(json) {
           try { window.__swHandle?.setPage(json ? JSON.parse(json) : null); }
@@ -103,6 +214,48 @@
         setGranularity(g) { try { window.__swHandle?.setGranularity(g); } catch (e) {} },
         async save() { try { await window.__swHandle?.save(); } catch (e) {} },
       };
+
+      // Checkbox-Toggle: nach dem nativen Klick-Toggle das `checked`-ATTRIBUT
+      // spiegeln (nur das landet in innerHTML/Save; die `.checked`-Property tut
+      // es nicht). Bubbling-Phase, damit der native Toggle schon angewandt ist.
+      document.addEventListener('click', (e) => {
+        const t = e.target;
+        if (!t || t.tagName !== 'INPUT' || t.type !== 'checkbox') return;
+        if (!t.closest('li.todo-item')) return;
+        if (t.checked) t.setAttribute('checked', '');
+        else t.removeAttribute('checked');
+        const el = activeEditor();
+        if (el) el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      }, false);
+
+      // Enter im Checkbox-Item: neues Item dahinter; leeres Item → Liste verlassen.
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0) return;
+        let node = sel.getRangeAt(0).startContainer;
+        if (node.nodeType === 3) node = node.parentNode;
+        const li = node && node.closest ? node.closest('li.todo-item') : null;
+        if (!li) return;
+        const ul = li.parentNode;
+        e.preventDefault();
+        const span = li.querySelector('.todo-text');
+        if (!span || !span.textContent.trim()) {
+          // Leeres Item → aus der Liste raus in einen frischen Absatz.
+          const p = document.createElement('p');
+          p.appendChild(document.createElement('br'));
+          ul.insertAdjacentElement('afterend', p);
+          li.remove();
+          if (ul && !ul.querySelector('li')) ul.remove();
+          placeCaret(p);
+        } else {
+          const next = makeTodoItem();
+          li.insertAdjacentElement('afterend', next.li);
+          placeCaret(next.span);
+        }
+        const el = activeEditor();
+        if (el) el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      }, false);
     })();
 
     function bootError(msg) {

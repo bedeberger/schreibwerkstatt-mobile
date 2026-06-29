@@ -36,6 +36,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.HorizontalRule
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
@@ -123,6 +125,21 @@ fun EditorScreen(
                         onBack()
                     }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
+                    }
+                },
+                actions = {
+                    // Block-Formatierung in den eingebetteten Focus-Editor (host.html).
+                    IconButton(onClick = { evalJs("window.__sw && window.__sw.insertHr();") }) {
+                        Icon(
+                            Icons.Filled.HorizontalRule,
+                            contentDescription = stringResource(R.string.editor_insert_divider),
+                        )
+                    }
+                    IconButton(onClick = { evalJs("window.__sw && window.__sw.insertChecklist();") }) {
+                        Icon(
+                            Icons.Filled.CheckBox,
+                            contentDescription = stringResource(R.string.editor_insert_checklist),
+                        )
                     }
                 },
             )

@@ -64,6 +64,8 @@
 
     <!-- Editor / Dictation -->
     <string name="editor_dictate">Diktieren</string>
+    <string name="editor_insert_divider">Trennlinie einfügen</string>
+    <string name="editor_insert_checklist">Checkliste einfügen</string>
     <string name="editor_stop">Stopp</string>
     <string name="editor_bundle_error">Editor konnte nicht geladen werden: %1$s</string>
     <string name="editor_conflict_title">Konflikt</string>

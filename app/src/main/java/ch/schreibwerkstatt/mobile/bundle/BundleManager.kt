@@ -55,7 +55,14 @@ class BundleManager(
             }
             http.newCall(reqBuilder.build()).execute().use { resp ->
                 when {
-                    resp.code == 304 -> Result.success(isReady())
+                    resp.code == 304 -> {
+                        // Server-Bundle unverändert → nicht neu entpacken. host.html
+                        // ist aber app-versioniert (mit dem APK ausgeliefert), nicht
+                        // bundle-versioniert: bei jedem Sync frisch aus den Assets
+                        // spiegeln, sonst hinkt sie nach einem App-Update hinterher.
+                        refreshHostPage()
+                        Result.success(isReady())
+                    }
                     resp.isSuccessful -> {
                         val body = resp.body ?: return@use Result.failure(
                             IllegalStateException("editor-bundle: leerer Body")
@@ -67,13 +74,13 @@ class BundleManager(
                     }
                     else -> {
                         // Offline/Fehler: vorhandenes Bundle weiterverwenden.
-                        if (isReady()) Result.success(true)
+                        if (isReady()) { refreshHostPage(); Result.success(true) }
                         else Result.failure(IllegalStateException("editor-bundle HTTP ${resp.code}"))
                     }
                 }
             }
         } catch (e: Exception) {
-            if (isReady()) Result.success(true) else Result.failure(e)
+            if (isReady()) { refreshHostPage(); Result.success(true) } else Result.failure(e)
         }
     }
 
@@ -108,5 +115,15 @@ class BundleManager(
         context.assets.open("editor-host/host.html").use { input ->
             File(bundleDir, "host.html").outputStream().use { input.copyTo(it) }
         }
+    }
+
+    /**
+     * host.html best-effort gegen die App-Assets aktualisieren, wenn bereits ein
+     * Bundle-Verzeichnis existiert (304-/Offline-Pfad). Fehler sind nicht-fatal:
+     * die bestehende host.html bleibt dann liegen.
+     */
+    private fun refreshHostPage() {
+        if (!bundleDir.exists()) return
+        runCatching { copyHostPage() }
     }
 }

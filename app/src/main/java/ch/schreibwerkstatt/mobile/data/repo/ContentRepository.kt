@@ -159,13 +159,25 @@ class ContentRepository(
     fun observePages(bookId: Long): Flow<List<PageEntity>> = db.pageDao().observeForBook(bookId)
 
     /**
-     * Seite für den Editor laden: erst Cache, sonst Server. Cached Seiten mit
-     * lokal-dirty Stand werden NICHT überschrieben (Pending-Write hängt dran).
+     * Seite für den Editor laden. Reihenfolge:
+     * 1. **Lokal-dirty** → immer der Cache: der Pending-Write hat Vorrang und darf
+     *    nie mit Server-Stand überschrieben werden (siehe Offline-first-Regel).
+     * 2. Sonst **best effort den frischen Server-Stand** holen und den Cache
+     *    aktualisieren. So sieht der Editor beim Öffnen den aktuellen Inhalt –
+     *    wichtig für Tagebuch-Einträge, die oft auch im Web bearbeitet werden und
+     *    deren bereits gecachte (nicht-dirty) Seite sonst veraltet angezeigt würde.
+     * 3. Schlägt der Server-Abruf fehl (offline / Serverfehler) → auf den Cache
+     *    zurückfallen, damit das Öffnen offline weiterhin funktioniert.
      */
     suspend fun loadPage(pageId: Long, bookId: Long): Result<PageEntity> = runCatching {
         val cached = db.pageDao().byId(pageId)
-        if (cached != null && (cached.html != null || cached.dirty)) return@runCatching cached
-        val dto = net.content(baseUrl()).page(pageId)
+        if (cached != null && cached.dirty) return@runCatching cached
+        val dto = try {
+            net.content(baseUrl()).page(pageId)
+        } catch (e: Exception) {
+            cached ?: throw e
+            return@runCatching cached
+        }
         val entity = PageEntity(
             id = dto.id,
             bookId = bookId,
