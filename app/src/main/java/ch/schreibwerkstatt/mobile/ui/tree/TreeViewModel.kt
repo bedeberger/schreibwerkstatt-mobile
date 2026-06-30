@@ -1,7 +1,9 @@
 package ch.schreibwerkstatt.mobile.ui.tree
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -57,17 +59,26 @@ data class TreeUiState(
 class TreeViewModel(
     private val repo: ContentRepository,
     private val coordinator: SyncCoordinator,
+    private val handle: SavedStateHandle,
     private val bookId: Long,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(TreeUiState(bookId = bookId))
+    // Über Process Death gerettete Kalender-Sicht (siehe SavedStateHandle-Keys unten).
+    private val savedMonth: YearMonth =
+        handle.get<String>(KEY_CAL_MONTH)?.let { runCatching { YearMonth.parse(it) }.getOrNull() }
+            ?: YearMonth.now()
+
+    private val _state = MutableStateFlow(TreeUiState(bookId = bookId, calendarMonth = savedMonth))
     val state: StateFlow<TreeUiState> = _state.asStateFlow()
 
     init {
         // Buchtyp aus dem Cache → entscheidet, ob der Kalender-Modus angeboten wird.
+        // Default-Modus = Tagebuch ⇒ Kalender, sofern der Nutzer ihn nicht bewusst
+        // umgeschaltet hat (dann gewinnt der gespeicherte Wert).
         viewModelScope.launch {
             val diary = repo.bookById(bookId)?.buchtyp == BUCHTYP_TAGEBUCH
-            _state.update { it.copy(isDiary = diary, calendarMode = diary) }
+            val mode = handle.get<Boolean>(KEY_CAL_MODE) ?: diary
+            _state.update { it.copy(isDiary = diary, calendarMode = mode) }
         }
         load()
         // Im Hintergrund Offline-Cache der Seiten auffrischen (Delta-Pull).
@@ -148,9 +159,16 @@ class TreeViewModel(
         }
     }
 
-    fun setCalendarMode(enabled: Boolean) = _state.update { it.copy(calendarMode = enabled) }
+    fun setCalendarMode(enabled: Boolean) {
+        handle[KEY_CAL_MODE] = enabled
+        _state.update { it.copy(calendarMode = enabled) }
+    }
 
-    fun stepMonth(delta: Long) = _state.update { it.copy(calendarMonth = it.calendarMonth.plusMonths(delta)) }
+    fun stepMonth(delta: Long) = _state.update {
+        val month = it.calendarMonth.plusMonths(delta)
+        handle[KEY_CAL_MONTH] = month.toString()
+        it.copy(calendarMonth = month)
+    }
 
     fun consumeMessage() = _state.update { it.copy(message = null) }
 
@@ -188,8 +206,14 @@ class TreeViewModel(
     }
 
     companion object {
+        /** SavedStateHandle-Keys: Kalender-Sicht über Process Death hinweg bewahren. */
+        private const val KEY_CAL_MODE = "tree_calendar_mode"
+        private const val KEY_CAL_MONTH = "tree_calendar_month"
+
         fun factory(locator: ServiceLocator, bookId: Long): ViewModelProvider.Factory = viewModelFactory {
-            initializer { TreeViewModel(locator.repository, locator.syncCoordinator, bookId) }
+            initializer {
+                TreeViewModel(locator.repository, locator.syncCoordinator, createSavedStateHandle(), bookId)
+            }
         }
     }
 }

@@ -16,13 +16,25 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 const val DEFAULT_SERVER_URL = "https://schreibwerkstatt.app"
-private const val TOKEN_PREFIX = "swd_"
+const val TOKEN_PREFIX = "swd_"
+
+/**
+ * Lokalisierbarer Pairing-Fehler. Das ViewModel emittiert nur den Typ; der
+ * [PairingScreen] löst ihn über `stringResource` auf (dynamische Detailtexte wie
+ * die Server-Fehlermeldung reisen als Argument mit).
+ */
+sealed interface PairingError {
+    data object UrlScheme : PairingError
+    data class TokenPrefix(val prefix: String) : PairingError
+    data object Unauthorized : PairingError
+    data class Unreachable(val detail: String) : PairingError
+}
 
 data class PairingUiState(
     val serverUrl: String = DEFAULT_SERVER_URL,
     val token: String = "",
     val deviceName: String = "",
-    val error: String? = null,
+    val error: PairingError? = null,
     val busy: Boolean = false,
 )
 
@@ -62,11 +74,11 @@ class PairingViewModel(
         val token = _state.value.token.trim()
 
         if (!rawUrl.startsWith("http://") && !rawUrl.startsWith("https://")) {
-            _state.value = _state.value.copy(error = "URL muss mit http:// oder https:// beginnen")
+            _state.value = _state.value.copy(error = PairingError.UrlScheme)
             return
         }
         if (!token.startsWith(TOKEN_PREFIX)) {
-            _state.value = _state.value.copy(error = "Token muss mit $TOKEN_PREFIX beginnen")
+            _state.value = _state.value.copy(error = PairingError.TokenPrefix(TOKEN_PREFIX))
             return
         }
 
@@ -83,9 +95,9 @@ class PairingViewModel(
                     onPaired()
                 }
                 is VerifyResult.Unauthorized ->
-                    _state.value = _state.value.copy(busy = false, error = "Token ungültig oder widerrufen.")
+                    _state.value = _state.value.copy(busy = false, error = PairingError.Unauthorized)
                 is VerifyResult.Failed ->
-                    _state.value = _state.value.copy(busy = false, error = "Server nicht erreichbar: ${r.message}")
+                    _state.value = _state.value.copy(busy = false, error = PairingError.Unreachable(r.message ?: ""))
             }
         }
     }

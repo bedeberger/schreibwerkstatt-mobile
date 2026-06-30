@@ -1,13 +1,16 @@
 package ch.schreibwerkstatt.mobile.ui
 
 import android.net.Uri
-import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -60,24 +63,25 @@ fun AppNav(locator: ServiceLocator) {
         }
     }
 
-    // Material-artige Tiefen-Navigation: Vorwärts gleitet der neue Screen von rechts
-    // herein, der alte nach links hinaus; beim Zurück spiegelverkehrt. Sanftes Fade
-    // dämpft die Kanten, damit der Schnitt nicht mehr hart wirkt.
+    // Material-„Shared Axis X": Das Fade trägt den Wechsel, ein kleiner horizontaler
+    // Versatz (~30dp) gibt nur die Richtung an (vorwärts/zurück). Kein Slide über die
+    // volle Bildschirmbreite mehr — der wirkte zusammen mit dem Fade unruhig.
     val slideDuration = 280
+    val slidePx = with(LocalDensity.current) { 30.dp.roundToPx() }
     NavHost(
         navController = navController,
         startDestination = start,
         enterTransition = {
-            slideIntoContainer(SlideDirection.Start, tween(slideDuration)) + fadeIn(tween(slideDuration))
+            slideInHorizontally(tween(slideDuration)) { slidePx } + fadeIn(tween(slideDuration))
         },
         exitTransition = {
-            slideOutOfContainer(SlideDirection.Start, tween(slideDuration)) + fadeOut(tween(slideDuration))
+            slideOutHorizontally(tween(slideDuration)) { -slidePx } + fadeOut(tween(slideDuration))
         },
         popEnterTransition = {
-            slideIntoContainer(SlideDirection.End, tween(slideDuration)) + fadeIn(tween(slideDuration))
+            slideInHorizontally(tween(slideDuration)) { -slidePx } + fadeIn(tween(slideDuration))
         },
         popExitTransition = {
-            slideOutOfContainer(SlideDirection.End, tween(slideDuration)) + fadeOut(tween(slideDuration))
+            slideOutHorizontally(tween(slideDuration)) { slidePx } + fadeOut(tween(slideDuration))
         },
     ) {
         composable(Routes.PAIRING) {

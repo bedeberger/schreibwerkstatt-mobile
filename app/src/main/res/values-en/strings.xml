@@ -1,0 +1,178 @@
+<resources>
+    <string name="app_name">Schreibwerkstatt</string>
+
+    <!-- General -->
+    <string name="action_back">Back</string>
+    <string name="search_clear">Clear search</string>
+    <string name="search_no_results">No matches for “%1$s”.</string>
+
+    <!-- Accessibility (screen reader / TalkBack). -->
+    <string name="a11y_action_open">open</string>
+    <string name="a11y_calendar_today">today</string>
+    <string name="a11y_calendar_has_entry">entry exists</string>
+    <string name="a11y_calendar_no_entry">no entry</string>
+
+    <!-- Pairing -->
+    <string name="pairing_title">Pair device</string>
+    <string name="pairing_server_label">Server address</string>
+    <string name="pairing_server_hint">https://schreibwerkstatt.app</string>
+    <string name="pairing_token_label">Access token</string>
+    <string name="pairing_token_hint">swd_…</string>
+    <string name="pairing_device_label">Device name (optional)</string>
+    <string name="pairing_login">Pair</string>
+    <string name="pairing_intro">Enter the server address and paste an access token. Create the token on the server under “Settings → Devices” and copy it here.</string>
+    <string name="pairing_busy">Verifying token…</string>
+    <string name="pairing_error_url_scheme">URL must start with http:// or https://</string>
+    <string name="pairing_error_prefix">Token must start with %1$s</string>
+    <string name="pairing_error_invalid">Token invalid or revoked.</string>
+    <string name="pairing_error_unreachable">Server unreachable: %1$s</string>
+
+    <!-- Books -->
+    <string name="books_title">Books</string>
+    <string name="books_search_hint">Search books</string>
+    <string name="books_empty">No books found.</string>
+    <string name="books_empty_hint">Pull down to refresh.</string>
+    <string name="books_load_error">Could not load books: %1$s</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_signout">Sign out this device</string>
+    <string name="settings_signout_hint">Signing out only removes the local token from this device. The token can be revoked on the server via the web interface.</string>
+    <string name="settings_stt_status">Dictation (STT)</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_check_update">Check for updates</string>
+    <string name="settings_checking_update">Checking…</string>
+    <string name="settings_up_to_date">You are already on the latest version.</string>
+
+    <!-- Settings: sections -->
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_sync">Synchronisation</string>
+    <string name="settings_section_account">Account &amp; device</string>
+    <string name="settings_section_about">About the app</string>
+
+    <!-- Settings: colour scheme -->
+    <string name="settings_theme">Colour scheme</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+
+    <!-- Settings: sync -->
+    <string name="settings_sync_status">Status</string>
+    <string name="settings_sync_online">Online</string>
+    <string name="settings_sync_offline">Offline</string>
+    <string name="settings_sync_all_synced">Everything synced</string>
+    <plurals name="settings_sync_pending">
+        <item quantity="one">%d change waiting to sync</item>
+        <item quantity="other">%d changes waiting to sync</item>
+    </plurals>
+    <string name="settings_sync_now">Sync now</string>
+    <string name="settings_sync_running">Syncing…</string>
+    <string name="settings_background_sync">Background sync</string>
+    <string name="settings_background_sync_hint">Automatically refresh books hourly in the background</string>
+
+    <!-- Settings: diagnostics -->
+    <string name="settings_diagnostics">Share diagnostic info</string>
+    <string name="settings_diagnostics_subject">Schreibwerkstatt – diagnostics</string>
+    <string name="settings_diagnostics_chooser">Share diagnostics</string>
+
+    <!-- Settings: sign-out confirmation -->
+    <string name="settings_signout_confirm_title">Sign out device?</string>
+    <string name="settings_signout_confirm_message">The local token will be removed from this device. Unsynced changes may be lost. Continue?</string>
+    <string name="settings_signout_confirm">Sign out</string>
+    <string name="action_cancel">Cancel</string>
+
+    <!-- Update dialog -->
+    <string name="update_available_title">Update available</string>
+    <string name="update_available_message">Version %1$s is available. Download and install now?</string>
+    <string name="update_download">Download</string>
+    <string name="update_downloading">Downloading… %1$d %%</string>
+    <string name="update_later">Later</string>
+    <string name="update_error_title">Update failed</string>
+    <string name="update_permission_title">Allow installation</string>
+    <string name="update_permission_message">To let the app install the update, you must allow “Install from this source”. Then tap Install again.</string>
+    <string name="update_permission_open">Open settings</string>
+    <string name="update_install">Install</string>
+    <string name="action_close">Close</string>
+    <string name="action_retry">Try again</string>
+
+    <!-- Tree (chapter/page tree) -->
+    <string name="tree_search_hint">Search page or content</string>
+    <string name="tree_page_updated">Last changed: %1$s</string>
+    <string name="tree_page_updated_unknown">Not yet synced</string>
+    <string name="tree_load_error">Error loading: %1$s</string>
+    <string name="history_title">History</string>
+    <string name="history_empty">No earlier versions yet.</string>
+    <string name="history_load_error">Error loading history: %1$s</string>
+    <string name="history_action_error">Action failed: %1$s</string>
+    <string name="history_words">%1$d words</string>
+    <string name="history_restore">Restore</string>
+    <string name="history_restore_confirm_title">Restore version?</string>
+    <string name="history_restore_confirm_message">The current page content will be replaced by this version. The previous state is kept as a new version in the history.</string>
+    <string name="history_source_focus">Focus editor</string>
+    <string name="history_source_main">Editor</string>
+    <string name="history_source_macapp">Mac app</string>
+    <string name="history_source_chat">Chat</string>
+    <string name="history_source_lektorat">Editing</string>
+    <string name="history_source_import">Import</string>
+    <string name="history_source_conflict">Conflict</string>
+    <string name="history_source_sync">Synchronisation</string>
+    <string name="history_source_unknown">Unknown</string>
+
+    <!-- Diary / calendar -->
+    <string name="calendar_show">Show calendar</string>
+    <string name="calendar_show_list">Show list</string>
+    <string name="calendar_today_entry">Today’s entry</string>
+    <string name="calendar_prev_month">Previous month</string>
+    <string name="calendar_next_month">Next month</string>
+    <string name="calendar_create_error">Could not create entry. Are you online?</string>
+
+    <!-- Editor / dictation -->
+    <string name="editor_dictate">Dictate</string>
+    <string name="editor_insert_divider">Insert divider</string>
+    <string name="editor_insert_checklist">Insert checklist</string>
+    <string name="editor_stop">Stop</string>
+    <string name="editor_bundle_error">Could not load editor: %1$s</string>
+    <string name="editor_bundle_error_fallback">Bundle error</string>
+    <string name="editor_conflict_title">Conflict</string>
+    <string name="editor_conflict_message">%1$s changed this page (%2$s). Compare both versions and choose which one stays:</string>
+    <string name="editor_conflict_someone">someone else</string>
+    <string name="editor_conflict_unknown_time">unknown</string>
+    <string name="editor_conflict_your_version">Your version</string>
+    <string name="editor_conflict_server_version">Server version</string>
+    <string name="editor_conflict_loading">Loading server version …</string>
+    <string name="editor_conflict_empty">(empty)</string>
+    <string name="editor_conflict_load_server">Use server</string>
+    <string name="editor_conflict_keep_local">Keep mine</string>
+    <string name="editor_conflict_indicator">Unresolved conflict – compare versions</string>
+    <!-- Editor snackbars (resolved in the screen from the ViewModel message type). -->
+    <string name="editor_msg_saved_offline">Saved offline – will sync later.</string>
+    <string name="editor_msg_conflict">Conflict: %1$s changed the page.</string>
+    <string name="editor_msg_locked">Page locked by %1$s.</string>
+    <string name="editor_lock_default">an editor</string>
+    <string name="editor_msg_error">Editor error: %1$s</string>
+    <string name="editor_msg_record_failed">Recording failed: %1$s</string>
+    <string name="editor_msg_server_resolved">Server version loaded – local change discarded.</string>
+    <string name="editor_msg_local_resolved">Your version saved.</string>
+    <string name="editor_msg_load_failed">Loading failed: %1$s</string>
+    <!-- Microphone permission (dictation). -->
+    <string name="editor_mic_denied">Microphone permission missing. Please allow it in the app settings to dictate.</string>
+    <string name="editor_mic_rationale_title">Microphone access</string>
+    <string name="editor_mic_rationale_message">Dictation needs access to the microphone. The recording is sent to your server solely for speech recognition.</string>
+    <string name="editor_mic_grant">Allow</string>
+    <string name="editor_mic_blocked">Microphone permission is permanently denied. Please enable it in the app settings.</string>
+    <string name="editor_mic_open_settings">Open settings</string>
+    <string name="editor_listening">Listening …</string>
+    <string name="editor_listening_hint">Tap to finish</string>
+    <string name="editor_transcribing">Transcribing …</string>
+
+    <!-- Sync status (offline/queue banner) -->
+    <string name="sync_offline">Offline – changes are saved locally</string>
+    <plurals name="sync_pending_offline">
+        <item quantity="one">Offline – %d change waiting to sync</item>
+        <item quantity="other">Offline – %d changes waiting to sync</item>
+    </plurals>
+    <plurals name="sync_pending_online">
+        <item quantity="one">Syncing %d change…</item>
+        <item quantity="other">Syncing %d changes…</item>
+    </plurals>
+</resources>

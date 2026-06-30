@@ -19,16 +19,30 @@ import kotlinx.serialization.json.Json
  *
  * Lade-/Speicher-Calls gehen über das [ContentRepository] (geteilter Room-Cache),
  * NICHT direkt gegen den Server.
+ *
+ * Speichern läuft bewusst im [saveScope] (App-Scope), nicht im an die WebView/das
+ * ViewModel gebundenen [scope]: Sobald der Editor einen Save an die Bridge übergibt,
+ * muss Persist + best-effort Flush auch dann durchlaufen, wenn die WebView gerade
+ * abgeräumt und das EditorViewModel gecancelt wird (Schliessen/Navigieren). Der
+ * Close-Pfad triggert den letzten Save und wartet via [onSaveStarted] nur auf diese
+ * Übergabe — nicht auf den (ggf. langsamen) Netzwerk-Flush.
  */
 class EditorBridge(
     private val repo: ContentRepository,
     private val scope: CoroutineScope,
+    private val saveScope: CoroutineScope,
     private val pageId: Long,
     private val bookId: Long,
     /** Führt JS auf dem UI-Thread aus (WebView.evaluateJavascript). */
     private val evalJs: (String) -> Unit,
     /** Native UI-Events (Snackbar etc.). */
     private val onEvent: (EditorEvent) -> Unit,
+    /**
+     * Wird synchron aufgerufen, sobald ein Save an die Bridge übergeben wurde
+     * (vor Persist/Flush). Gibt den Close-Barrier frei, der vor dem WebView-`destroy()`
+     * auf die Übergabe wartet.
+     */
+    private val onSaveStarted: () -> Unit,
     /** Dark-Mode-Wunsch (folgt isSystemInDarkTheme); steuert `data-theme` in der WebView. */
     private val darkTheme: Boolean,
 ) {
@@ -63,7 +77,12 @@ class EditorBridge(
 
     @JavascriptInterface
     fun savePage(reqId: String, payloadJson: String) {
-        scope.launch {
+        // Übergabe ans Native erfolgt: Close-Barrier freigeben, BEVOR der
+        // (potenziell langsame, weil netzgebundene) Persist/Flush startet.
+        onSaveStarted()
+        // App-Scope: überlebt das Abräumen von WebView/EditorViewModel beim
+        // Schliessen/Navigieren, damit ein angestossener Save nie verloren geht.
+        saveScope.launch {
             val payload = runCatching { json.decodeFromString(SavePayload.serializer(), payloadJson) }.getOrNull()
             if (payload == null) {
                 evalJs("window.__sw.reject('${reqId.esc()}', 'bad payload');")

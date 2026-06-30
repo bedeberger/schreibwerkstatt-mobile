@@ -30,6 +30,17 @@
       overflow-wrap: anywhere !important;
       word-break: normal;
     }
+    /* Trennlinie (<hr>, Android-Toolbar `insertHr`). Das Bundle-CSS
+       (focus-mode.css `.focus-editor__content hr { border:none; height:0 }`)
+       neutralisiert <hr> für Web/Mac und macht es damit unsichtbar — es wird
+       NACH diesem <style> injiziert, also hier mit `!important` zurückholen.
+       Sichtbare Linie über die volle Schreibbreite, themefähig. */
+    .focus-editor__content hr {
+      border: none !important;
+      border-top: 1px solid var(--color-border, rgba(0, 0, 0, 0.2)) !important;
+      height: 0 !important;
+      margin: 1em 0 !important;
+    }
     /* Checkbox-Listen (Android-Toolbar `insertChecklist`). Markup:
        <ul class="todo"><li class="todo-item"><input type=checkbox>
          <span class="todo-text">…</span></li></ul>

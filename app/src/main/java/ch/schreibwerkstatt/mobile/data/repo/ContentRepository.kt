@@ -318,6 +318,48 @@ class ContentRepository(
         db.pageDao().byId(pageId)!!
     }
 
+    /**
+     * Beide Konflikt-Fassungen als Klartext für die Vergleichsansicht: die lokale,
+     * noch nicht durchgesetzte Änderung (aus dem dirty-Cache) und der aktuelle
+     * Server-Stand (frisch geladen). Rein lesend — verändert weder Cache noch Queue.
+     */
+    suspend fun conflictPreview(pageId: Long): Result<ConflictPreview> = runCatching {
+        val localHtml = db.pageDao().byId(pageId)?.html
+        val serverHtml = net.content(baseUrl()).page(pageId).html
+        ConflictPreview(
+            local = HtmlText.toPlain(localHtml).orEmpty(),
+            server = HtmlText.toPlain(serverHtml).orEmpty(),
+        )
+    }
+
+    /**
+     * Konflikt auflösen zugunsten der lokalen Fassung: den server­seitigen Stand
+     * bewusst überschreiben. Dazu wird der aktuelle Server-`updated_at` als
+     * `expected_updated_at` mitgeschickt, damit der erneute Save den 409-Guard
+     * passiert. Erfolg ⇒ Pending-Write entfernt, Cache auf den (bestätigten)
+     * Server-Stand gesetzt. Schlägt der Push fehl (offline/erneuter Fremd-Save),
+     * bleibt der Konflikt-Pending-Write bestehen.
+     */
+    suspend fun resolveWithLocalVersion(pageId: Long, bookId: Long): Result<PageEntity> = runCatching {
+        val pending = db.pendingWriteDao().latestForPage(pageId)
+            ?: error("Kein lokaler Stand für Seite $pageId")
+        val serverUpdatedAt = net.content(baseUrl()).page(pageId).updated_at
+        val result = flushOne(
+            localId = pending.localId,
+            pageId = pageId,
+            bookId = bookId,
+            html = pending.html,
+            deviceId = pending.deviceId,
+            baseUpdatedAt = serverUpdatedAt,
+        )
+        when (result) {
+            is SaveResult.Saved -> result.page
+            is SaveResult.Conflict -> error("Erneuter Konflikt beim Überschreiben")
+            is SaveResult.Locked -> error("Seite gesperrt")
+            SaveResult.Queued -> error("Server nicht erreichbar")
+        }
+    }
+
     // ── Seiten-Versionen (Revisions) ─────────────────────────────────────────
 
     /** Versionsliste einer Seite (Metadaten, ohne HTML-Body). */

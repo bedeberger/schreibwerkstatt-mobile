@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Per-App-Sprachwahl (Android 13+): listet die übersetzten Sprachen, damit das
+     System unter „Einstellungen → Apps → Sprache" einen Umschalter anbietet.
+     Reihenfolge = Default-Priorität; Deutsch ist die Quell-/Default-Sprache. -->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="de" />
+    <locale android:name="en" />
+</locale-config>

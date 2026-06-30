@@ -24,6 +24,10 @@
     <string name="pairing_login">Koppeln</string>
     <string name="pairing_intro">Server-Adresse eingeben und ein Zugangstoken einfügen. Das Token erstellst du am Server unter „Einstellungen → Geräte" und kopierst es hierher.</string>
     <string name="pairing_busy">Token wird geprüft…</string>
+    <string name="pairing_error_url_scheme">URL muss mit http:// oder https:// beginnen</string>
+    <string name="pairing_error_prefix">Token muss mit %1$s beginnen</string>
+    <string name="pairing_error_invalid">Token ungültig oder widerrufen.</string>
+    <string name="pairing_error_unreachable">Server nicht erreichbar: %1$s</string>
 
     <!-- Books -->
     <string name="books_title">Bücher</string>
@@ -130,14 +134,35 @@
     <string name="editor_insert_checklist">Checkliste einfügen</string>
     <string name="editor_stop">Stopp</string>
     <string name="editor_bundle_error">Editor konnte nicht geladen werden: %1$s</string>
+    <string name="editor_bundle_error_fallback">Bundle-Fehler</string>
     <string name="editor_conflict_title">Konflikt</string>
-    <string name="editor_conflict_message">Diese Seite wurde von %1$s geändert (%2$s). Server-Version laden und lokale Änderung verwerfen?</string>
+    <string name="editor_conflict_message">%1$s hat diese Seite geändert (%2$s). Vergleiche beide Fassungen und wähle, welche bestehen bleibt:</string>
     <string name="editor_conflict_someone">jemand anderem</string>
     <string name="editor_conflict_unknown_time">unbekannt</string>
-    <string name="editor_conflict_load_server">Server-Version laden</string>
-    <string name="editor_conflict_keep_local">Lokale behalten</string>
-    <string name="editor_conflict_indicator">Ungelöster Konflikt – Server-Version laden</string>
+    <string name="editor_conflict_your_version">Deine Version</string>
+    <string name="editor_conflict_server_version">Server-Version</string>
+    <string name="editor_conflict_loading">Server-Version wird geladen …</string>
+    <string name="editor_conflict_empty">(leer)</string>
+    <string name="editor_conflict_load_server">Server übernehmen</string>
+    <string name="editor_conflict_keep_local">Meine behalten</string>
+    <string name="editor_conflict_indicator">Ungelöster Konflikt – Fassungen vergleichen</string>
+    <!-- Editor-Snackbars (im Screen aus dem ViewModel-Message-Typ aufgelöst). -->
+    <string name="editor_msg_saved_offline">Offline gespeichert – wird später synchronisiert.</string>
+    <string name="editor_msg_conflict">Konflikt: %1$s hat die Seite geändert.</string>
+    <string name="editor_msg_locked">Seite gesperrt durch %1$s.</string>
+    <string name="editor_lock_default">Lektorat</string>
+    <string name="editor_msg_error">Editor-Fehler: %1$s</string>
+    <string name="editor_msg_record_failed">Aufnahme fehlgeschlagen: %1$s</string>
+    <string name="editor_msg_server_resolved">Server-Version geladen – lokale Änderung verworfen.</string>
+    <string name="editor_msg_local_resolved">Deine Version gespeichert.</string>
+    <string name="editor_msg_load_failed">Laden fehlgeschlagen: %1$s</string>
+    <!-- Mikrofon-Berechtigung (Diktat). -->
     <string name="editor_mic_denied">Mikrofon-Berechtigung fehlt. Bitte in den App-Einstellungen erlauben, um zu diktieren.</string>
+    <string name="editor_mic_rationale_title">Mikrofon-Zugriff</string>
+    <string name="editor_mic_rationale_message">Zum Diktieren braucht die App Zugriff auf das Mikrofon. Die Aufnahme wird ausschliesslich zur Texterkennung an deinen Server gesendet.</string>
+    <string name="editor_mic_grant">Erlauben</string>
+    <string name="editor_mic_blocked">Mikrofon-Berechtigung ist dauerhaft abgelehnt. Bitte in den App-Einstellungen aktivieren.</string>
+    <string name="editor_mic_open_settings">Einstellungen öffnen</string>
     <string name="editor_listening">Höre zu …</string>
     <string name="editor_listening_hint">Tippen zum Beenden</string>
     <string name="editor_transcribing">Transkribiere …</string>

@@ -83,7 +83,7 @@ fun PairingScreen(onPaired: () -> Unit) {
             )
             state.error?.let {
                 Text(
-                    it,
+                    pairingErrorText(it),
                     color = MaterialTheme.colorScheme.error,
                     // Fehler beim Koppeln sofort ansagen – sonst bleibt er für
                     // Screenreader-Nutzer unbemerkt.
@@ -103,4 +103,13 @@ fun PairingScreen(onPaired: () -> Unit) {
             }
         }
     }
+}
+
+/** Löst den lokalisierbaren [PairingError]-Typ in den anzuzeigenden Text auf. */
+@Composable
+private fun pairingErrorText(error: PairingError): String = when (error) {
+    PairingError.UrlScheme -> stringResource(R.string.pairing_error_url_scheme)
+    is PairingError.TokenPrefix -> stringResource(R.string.pairing_error_prefix, error.prefix)
+    PairingError.Unauthorized -> stringResource(R.string.pairing_error_invalid)
+    is PairingError.Unreachable -> stringResource(R.string.pairing_error_unreachable, error.detail)
 }

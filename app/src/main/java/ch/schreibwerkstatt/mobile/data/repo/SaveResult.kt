@@ -22,3 +22,11 @@ sealed interface SaveResult {
         val expiresAt: String?,
     ) : SaveResult
 }
+
+/** Beide Fassungen eines Seiten-Konflikts als Klartext für die Vergleichsansicht. */
+data class ConflictPreview(
+    /** Lokale, noch nicht durchgesetzte Änderung. */
+    val local: String,
+    /** Aktueller Server-Stand. */
+    val server: String,
+)

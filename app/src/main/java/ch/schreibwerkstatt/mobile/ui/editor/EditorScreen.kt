@@ -2,7 +2,11 @@ package ch.schreibwerkstatt.mobile.ui.editor
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -20,19 +24,26 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -62,6 +73,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -82,6 +94,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.max
 import kotlin.math.sin
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -91,6 +104,8 @@ import ch.schreibwerkstatt.mobile.editor.EditorBridge
 import ch.schreibwerkstatt.mobile.locator
 import ch.schreibwerkstatt.mobile.ui.components.SkeletonParagraphs
 import ch.schreibwerkstatt.mobile.ui.components.pageFlipGestures
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 private const val APP_ORIGIN = "https://appassets.androidplatform.net"
@@ -116,16 +131,45 @@ fun EditorScreen(
     val evalJs: (String) -> Unit = { js -> webViewRef.value?.post { webViewRef.value?.evaluateJavascript(js, null) } }
 
     val micDeniedMsg = stringResource(R.string.editor_mic_denied)
+    val activity = context as? Activity
+    // Dialoge der Mikrofon-Berechtigung (Diktat): Begründung vor erneuter Anfrage,
+    // bzw. Hinweis auf die App-Einstellungen bei dauerhafter Ablehnung.
+    var showMicRationale by remember { mutableStateOf(false) }
+    var showMicBlocked by remember { mutableStateOf(false) }
+
+    val startDictation = { vm.toggleDictation { text -> insertText(evalJs, text) } }
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) vm.toggleDictation { text -> insertText(evalJs, text) }
-        else vm.notify(micDeniedMsg)
+        when {
+            granted -> startDictation()
+            // Nach der Anfrage keine Begründung mehr erlaubt → dauerhaft abgelehnt
+            // („Nicht mehr fragen"): zu den App-Einstellungen leiten.
+            activity != null && !ActivityCompat.shouldShowRequestPermissionRationale(
+                activity, Manifest.permission.RECORD_AUDIO
+            ) -> showMicBlocked = true
+            else -> vm.notify(micDeniedMsg)
+        }
+    }
+    // Berechtigungs-Gate für den Diktat-Start: erteilt → direkt; vorher abgelehnt
+    // (Begründung erlaubt) → Begründung zeigen; sonst direkt anfragen.
+    val requestDictation = {
+        val granted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        when {
+            granted -> startDictation()
+            activity != null && ActivityCompat.shouldShowRequestPermissionRationale(
+                activity, Manifest.permission.RECORD_AUDIO
+            ) -> showMicRationale = true
+            else -> micPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
     }
 
-    // Snackbar-Events.
-    LaunchedEffect(state.snackbar) {
-        state.snackbar?.let {
+    // Snackbar-Events: lokalisierbaren Message-Typ hier (Composable-Scope) auflösen.
+    val messageText = state.message?.let { resolveEditorMsg(context, it) }
+    LaunchedEffect(state.message) {
+        messageText?.let {
             snackbarHost.showSnackbar(it)
-            vm.consumeSnackbar()
+            vm.consumeMessage()
         }
     }
 
@@ -135,8 +179,8 @@ fun EditorScreen(
                 title = { Text(pageTitle) },
                 navigationIcon = {
                     IconButton(onClick = {
-                        // Vor dem Verlassen flushen (host.html: window.__sw.save()).
-                        evalJs("window.__sw && window.__sw.save();")
+                        // Speichern übernimmt zentral der onDispose-Barrier (siehe unten),
+                        // sobald dieser Screen die Komposition verlässt.
                         onBack()
                     }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
@@ -156,7 +200,6 @@ fun EditorScreen(
                     }
                     // Versionsverlauf der Seite.
                     IconButton(onClick = {
-                        evalJs("window.__sw && window.__sw.save();")
                         onOpenHistory(pageId, pageTitle)
                     }) {
                         Icon(
@@ -187,13 +230,9 @@ fun EditorScreen(
                     if (state.transcribing) return@FloatingActionButton
                     // Taktiles Feedback beim Diktat-Start/Stop, da der Schnitt sonst stumm bleibt.
                     vibrateTick(context)
-                    // Bereits erteilt → direkt toggeln (start/stop). Sonst Berechtigung
-                    // anfragen; der Launcher-Callback startet bei Erfolg, sonst Hinweis.
-                    val granted = ContextCompat.checkSelfPermission(
-                        context, Manifest.permission.RECORD_AUDIO
-                    ) == PackageManager.PERMISSION_GRANTED
-                    if (granted) vm.toggleDictation { text -> insertText(evalJs, text) }
-                    else micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                    // Berechtigung prüfen → ggf. Begründung/Anfrage; bei Erfolg toggelt der
+                    // Callback bzw. direkt start/stop des Diktats.
+                    requestDictation()
                 }) {
                     when {
                         state.transcribing -> CircularProgressIndicator(strokeWidth = 2.dp)
@@ -209,17 +248,12 @@ fun EditorScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .pageFlipGestures(
+                    // Speichern erledigt der onDispose-Barrier beim Verlassen der Komposition.
                     onPrev = state.prevPage?.let { p ->
-                        {
-                            evalJs("window.__sw && window.__sw.save();")
-                            onNavigateToPage(p.id, p.name)
-                        }
+                        { onNavigateToPage(p.id, p.name) }
                     },
                     onNext = state.nextPage?.let { n ->
-                        {
-                            evalJs("window.__sw && window.__sw.save();")
-                            onNavigateToPage(n.id, n.name)
-                        }
+                        { onNavigateToPage(n.id, n.name) }
                     },
                 )
         ) {
@@ -256,37 +290,114 @@ fun EditorScreen(
         }
     }
 
-    // Konflikt-Dialog (409): Server-Version laden / lokale behalten.
+    // Konflikt-Dialog (409): beide Fassungen vergleichen, dann bewusst wählen,
+    // welche bestehen bleibt (Server übernehmen ODER eigene Fassung durchsetzen).
     state.conflict?.let { c ->
         val editorName = c.serverEditorName ?: stringResource(R.string.editor_conflict_someone)
         val updatedAt = c.serverUpdatedAt ?: stringResource(R.string.editor_conflict_unknown_time)
+        val emptyLabel = stringResource(R.string.editor_conflict_empty)
         AlertDialog(
             onDismissRequest = vm::dismissConflict,
             title = { Text(stringResource(R.string.editor_conflict_title)) },
             text = {
-                Text(stringResource(R.string.editor_conflict_message, editorName, updatedAt))
+                Column {
+                    Text(stringResource(R.string.editor_conflict_message, editorName, updatedAt))
+                    Spacer(Modifier.height(16.dp))
+                    if (state.conflictLoading && state.conflictServerText == null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Text(stringResource(R.string.editor_conflict_loading))
+                        }
+                    } else {
+                        ConflictVersionBlock(
+                            label = stringResource(R.string.editor_conflict_your_version),
+                            text = state.conflictLocalText?.ifBlank { emptyLabel } ?: emptyLabel,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        ConflictVersionBlock(
+                            label = stringResource(R.string.editor_conflict_server_version),
+                            text = state.conflictServerText?.ifBlank { emptyLabel } ?: emptyLabel,
+                        )
+                    }
+                }
             },
             confirmButton = {
                 TextButton(onClick = {
                     vm.resolveConflictWithServer { html ->
-                        // Saubereren Server-Stand still in den Editor spielen (kein Save).
+                        // Server-Stand still in den Editor spielen (kein erneuter Save).
                         val payload = JSONObject().put("id", pageId).put("html", html).toString()
                         evalJs("window.__sw && window.__sw.setPage(${jsString(payload)});")
                     }
                 }) { Text(stringResource(R.string.editor_conflict_load_server)) }
             },
             dismissButton = {
-                TextButton(onClick = vm::dismissConflict) { Text(stringResource(R.string.editor_conflict_keep_local)) }
+                // Eigene Fassung durchsetzen (überschreibt den Server). Der Editor zeigt
+                // sie bereits an, daher kein setPage nötig.
+                TextButton(onClick = vm::resolveConflictWithLocal) {
+                    Text(stringResource(R.string.editor_conflict_keep_local))
+                }
             },
         )
     }
 
-    // Beim Verlassen: speichern + WebView abräumen.
+    // Mikrofon-Begründung: vor erneuter Anfrage erklären, wozu das Diktat das Mikrofon braucht.
+    if (showMicRationale) {
+        AlertDialog(
+            onDismissRequest = { showMicRationale = false },
+            title = { Text(stringResource(R.string.editor_mic_rationale_title)) },
+            text = { Text(stringResource(R.string.editor_mic_rationale_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showMicRationale = false
+                    micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                }) { Text(stringResource(R.string.editor_mic_grant)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMicRationale = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
+
+    // Dauerhaft abgelehnt: in die App-Einstellungen leiten (dort lässt sich das Recht aktivieren).
+    if (showMicBlocked) {
+        AlertDialog(
+            onDismissRequest = { showMicBlocked = false },
+            title = { Text(stringResource(R.string.editor_mic_rationale_title)) },
+            text = { Text(stringResource(R.string.editor_mic_blocked)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showMicBlocked = false
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", context.packageName, null),
+                        )
+                    )
+                }) { Text(stringResource(R.string.editor_mic_open_settings)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMicBlocked = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
+
+    // Beim Verlassen (Back, History, Wisch-Navigation): einziger, verlässlicher
+    // Schliess-Save. Wir stossen den finalen Save an und warten kurz, bis der Editor
+    // ihn an die Bridge übergeben hat — erst DANN wird die WebView abgeräumt, damit
+    // die (asynchrone) JS-Save-Kette die Übergabe sicher erreicht. Persist/Flush selbst
+    // läuft im applicationScope weiter und überlebt das destroy(). Der ganze Ablauf
+    // hängt am applicationScope, nicht am (gleich gecancelten) viewModelScope.
+    val appScope = context.locator.applicationScope
     DisposableEffect(Unit) {
         onDispose {
-            webViewRef.value?.let { wv ->
-                wv.evaluateJavascript("window.__sw && window.__sw.save();", null)
-                wv.destroy()
+            val wv = webViewRef.value
+            webViewRef.value = null
+            if (wv != null) {
+                appScope.launch(Dispatchers.Main) {
+                    vm.saveBeforeClose { js -> wv.evaluateJavascript(js, null) }
+                    wv.destroy()
+                }
             }
         }
     }
@@ -299,6 +410,54 @@ private fun insertText(evalJs: (String) -> Unit, text: String) {
 
 /** Sicheres JS-/JSON-String-Literal. */
 private fun jsString(value: String): String = JSONObject.quote(value)
+
+/** Löst den lokalisierbaren [EditorMsg]-Typ in den anzuzeigenden Snackbar-Text auf. */
+private fun resolveEditorMsg(context: Context, msg: EditorMsg): String = when (msg) {
+    EditorMsg.SavedOffline -> context.getString(R.string.editor_msg_saved_offline)
+    is EditorMsg.Conflict -> context.getString(
+        R.string.editor_msg_conflict,
+        msg.editorName ?: context.getString(R.string.editor_conflict_someone),
+    )
+    is EditorMsg.Locked -> context.getString(
+        R.string.editor_msg_locked,
+        msg.lockedBy ?: context.getString(R.string.editor_lock_default),
+    )
+    is EditorMsg.EditorError -> context.getString(R.string.editor_msg_error, msg.detail)
+    is EditorMsg.RecordFailed -> context.getString(R.string.editor_msg_record_failed, msg.detail)
+    EditorMsg.ServerResolved -> context.getString(R.string.editor_msg_server_resolved)
+    EditorMsg.LocalResolved -> context.getString(R.string.editor_msg_local_resolved)
+    is EditorMsg.LoadFailed -> context.getString(R.string.editor_msg_load_failed, msg.detail)
+    is EditorMsg.Raw -> msg.text
+}
+
+/**
+ * Eine beschriftete, scrollbare Fassung im Konflikt-Vergleich. Höhe gedeckelt,
+ * damit der Dialog auch bei langem Text handhabbar bleibt.
+ */
+@Composable
+private fun ConflictVersionBlock(label: String, text: String) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(Modifier.height(4.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(max = 140.dp)
+                .border(
+                    BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    RoundedCornerShape(8.dp),
+                )
+                .verticalScroll(rememberScrollState())
+                .padding(10.dp),
+        ) {
+            Text(text, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
 
 /**
  * Kurzer, spürbarer Vibrations-Tick beim Diktat-Start/-Stop. Respektiert fehlende
