@@ -118,14 +118,86 @@ class ContentRepositorySaveTest {
         assertEquals(1, db.pendingWriteDao().byStatus(PendingWriteEntity.STATUS_PENDING).size)
     }
 
-    @Test fun `server error 500 returns Queued and marks the write failed`() = runTest {
+    @Test fun `transient server error 500 keeps the write pending for retry`() = runTest {
         api.savePageResponder = { FakeContentApi.error(500, """{"error_code":"INTERNAL"}""") }
 
         val res = repo.savePage(pageId, bookId, "<p>local</p>")
 
         assertTrue(res is SaveResult.Queued)
-        db.pendingWriteDao().byStatus(PendingWriteEntity.STATUS_FAILED).single().let {
+        // 5xx ist transient → pending LASSEN, damit flushPending erneut versucht
+        // (sonst friert die dirty-Seite dauerhaft ein).
+        assertTrue(db.pendingWriteDao().byStatus(PendingWriteEntity.STATUS_FAILED).isEmpty())
+        db.pendingWriteDao().byStatus(PendingWriteEntity.STATUS_PENDING).single().let {
             assertEquals("INTERNAL", it.note)
         }
+    }
+
+    @Test fun `non-transient client error 400 marks the write failed`() = runTest {
+        api.savePageResponder = { FakeContentApi.error(400, """{"error_code":"BAD_REQUEST"}""") }
+
+        val res = repo.savePage(pageId, bookId, "<p>local</p>")
+
+        assertTrue(res is SaveResult.Queued)
+        db.pendingWriteDao().byStatus(PendingWriteEntity.STATUS_FAILED).single().let {
+            assertEquals("BAD_REQUEST", it.note)
+        }
+    }
+
+    @Test fun `pending write parked by 500 is retried and confirmed by flushPending`() = runTest {
+        // Erster Save → 500 → bleibt pending.
+        api.savePageResponder = { FakeContentApi.error(500, """{"error_code":"INTERNAL"}""") }
+        repo.savePage(pageId, bookId, "<p>local</p>")
+        assertEquals(1, db.pendingWriteDao().byStatus(PendingWriteEntity.STATUS_PENDING).size)
+
+        // Server wieder gesund → flushPending drainiert die Queue.
+        api.savePageResponder = { Response.success(PageDto(id = pageId, html = "<p>server</p>", updated_at = "t1")) }
+        val drained = repo.flushPending().getOrThrow()
+
+        assertEquals(1, drained)
+        assertTrue(db.pendingWriteDao().byStatus(PendingWriteEntity.STATUS_PENDING).isEmpty())
+        assertFalse(db.pageDao().byId(pageId)!!.dirty)
+    }
+
+    @Test fun `flushPending drains many writes and does not abort on a conflict`() = runTest {
+        val p2 = 20L
+        db.pageDao().upsert(PageEntity(id = p2, bookId = bookId, name = "S2", html = "<p>o2</p>", updatedAt = "t0"))
+        // Beide Seiten offline speichern (IOException → pending).
+        api.savePageResponder = { throw java.io.IOException("offline") }
+        repo.savePage(pageId, bookId, "<p>a</p>")
+        repo.savePage(p2, bookId, "<p>b</p>")
+        assertEquals(2, db.pendingWriteDao().byStatus(PendingWriteEntity.STATUS_PENDING).size)
+
+        // Beim Flush: pageId → Konflikt, p2 → Saved. Der Konflikt darf p2 nicht blockieren.
+        api.savePageResponder = { req ->
+            if (req.html == "<p>a</p>") FakeContentApi.error(409, """{"error_code":"PAGE_CONFLICT","server_editor_name":"X"}""")
+            else Response.success(PageDto(id = p2, html = req.html, updated_at = "t1"))
+        }
+        val ok = repo.flushPending().getOrThrow()
+
+        assertEquals(1, ok) // p2 bestätigt
+        assertEquals(1, db.pendingWriteDao().byStatus(PendingWriteEntity.STATUS_CONFLICT).size)
+    }
+
+    @Test fun `loadPage returns dirty cache without hitting the server`() = runTest {
+        db.pageDao().updateHtml(pageId, "<p>dirty local</p>", "dirty local", dirty = true)
+        var serverHit = false
+        api.pageResponder = { serverHit = true; PageDto(id = it, html = "<p>server</p>") }
+
+        val page = repo.loadPage(pageId, bookId).getOrThrow()
+
+        assertFalse(serverHit) // dirty → Server NICHT angefragt
+        assertEquals("<p>dirty local</p>", page.html)
+    }
+
+    @Test fun `refreshBooks with empty server response does not wipe the cache`() = runTest {
+        // FakeContentApi.books() liefert leere Liste → deleteMissing darf NICHT alles löschen.
+        repo.refreshBooks().getOrThrow()
+
+        assertEquals("S", db.pageDao().byId(pageId)?.name) // Seite unberührt
+        assertEquals(0, db.bookDao().all().count { it.id == 999L })
+        // Vorab ein Buch anlegen, dann erneut mit leerer Antwort refreshen:
+        db.bookDao().upsertAll(listOf(ch.schreibwerkstatt.mobile.data.db.BookEntity(id = 999L, name = "B")))
+        repo.refreshBooks().getOrThrow()
+        assertEquals(1, db.bookDao().all().count { it.id == 999L }) // Buch bleibt erhalten
     }
 }

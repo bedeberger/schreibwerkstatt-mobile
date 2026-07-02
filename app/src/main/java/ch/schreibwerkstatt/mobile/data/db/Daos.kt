@@ -108,4 +108,12 @@ interface PendingWriteDao {
     /** Beim Queuen einer neuen Version ältere Pending-Writes derselben Seite zusammenfassen. */
     @Query("DELETE FROM pending_writes WHERE pageId = :pageId AND status = :status")
     suspend fun deletePendingForPage(pageId: Long, status: String = PendingWriteEntity.STATUS_PENDING)
+
+    /**
+     * ALLE Queue-Einträge einer Seite entfernen (jeden Status). Bei Konfliktauflösung
+     * verwenden, damit keine verwaisten conflict/locked/failed-Zeilen liegen bleiben,
+     * die sonst [latestForPage] belegen und den gelösten Konflikt maskieren würden.
+     */
+    @Query("DELETE FROM pending_writes WHERE pageId = :pageId")
+    suspend fun deleteAllForPage(pageId: Long)
 }

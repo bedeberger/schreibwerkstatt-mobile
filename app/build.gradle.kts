@@ -8,6 +8,12 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// Room-Schema-Export (exportSchema=true): versioniertes Schema pro DB-Version unter
+// app/schemas/ committen — Grundlage für datenerhaltende Migrationen + MigrationTestHelper.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 // Version aus version.properties (einzige Quelle der Wahrheit, siehe CLAUDE.md).
 val versionProps = Properties().apply {
     rootProject.file("version.properties").inputStream().use { load(it) }

@@ -106,6 +106,22 @@ class SyncEngineTest {
         }
     }
 
+    @Test fun `pull terminates when server signals has_more but the cursor does not advance`() = runTest {
+        // Fehlerhafter Server: has_more=true, aber kein Cursor-Fortschritt (cursor=null).
+        // Ohne Schutz würde die identische Anfrage endlos wiederholt.
+        api.syncQueue += SyncResponse(
+            now = "now",
+            pages = listOf(syncPage(30, "<p>x</p>")),
+            has_more = true,
+            cursor = null,
+        )
+
+        engine.pullBook(bookId, baseUrl).getOrThrow() // terminiert überhaupt = Beweis
+
+        assertEquals(1, api.syncCalls) // genau eine Runde, dann Abbruch
+        assertNotNull(db.pageDao().byId(30))
+    }
+
     @Test fun `pagination follows has_more and forwards the cursor`() = runTest {
         api.syncQueue += SyncResponse(
             now = "now1",

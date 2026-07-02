@@ -6,6 +6,7 @@ import ch.schreibwerkstatt.mobile.data.db.PendingWriteEntity
 import ch.schreibwerkstatt.mobile.data.db.SyncCursorEntity
 import ch.schreibwerkstatt.mobile.data.net.NetworkClient
 import ch.schreibwerkstatt.mobile.data.prefs.SettingsStore
+import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -28,19 +29,17 @@ class SyncEngine(
         var sinceId = cursor?.sinceId
         var nowIso: String? = null
 
+        var guard = 0
         while (true) {
             val resp = api.sync(bookId, since, sinceId, limit = 200)
             nowIso = resp.now
             if (resp.pages.isNotEmpty()) {
                 // HTML→Klartext-Strippen ist CPU-Arbeit → vom (oft Main-)Aufrufer-
                 // Dispatcher wegziehen, damit der Pull die UI nicht ruckeln lässt.
-                val entities = withContext(Dispatchers.Default) {
-                    resp.pages.mapNotNull { p ->
-                        // Lokal-dirty Seiten nicht mit Server-Stand überschreiben —
-                        // der Pending-Write hat Vorrang bis zum Flush/Konflikt.
-                        val local = db.pageDao().byId(p.page_id)
-                        if (local?.dirty == true) return@mapNotNull null
-                        PageEntity(
+                // (Ausserhalb der DB-Transaktion, damit diese kurz bleibt.)
+                val candidates = withContext(Dispatchers.Default) {
+                    resp.pages.map { p ->
+                        p.page_id to PageEntity(
                             id = p.page_id,
                             bookId = bookId,
                             chapterId = p.chapter_id,
@@ -52,14 +51,29 @@ class SyncEngine(
                         )
                     }
                 }
-                db.pageDao().upsertAll(entities)
+                // Dirty-Recheck UND Upsert atomar in einer Transaktion: schliesst das
+                // TOCTOU-Fenster, in dem ein zwischen Prüfung und Upsert eintreffender
+                // lokaler Save die Seite dirty macht und sonst überschrieben würde.
+                // Lokal-dirty Seiten behalten so garantiert ihren Pending-Write-Vorrang.
+                db.withTransaction {
+                    val fresh = candidates
+                        .filter { (id, _) -> db.pageDao().byId(id)?.dirty != true }
+                        .map { it.second }
+                    if (fresh.isNotEmpty()) db.pageDao().upsertAll(fresh)
+                }
             }
             // Cursor fortschreiben.
+            val prevSince = since
+            val prevSinceId = sinceId
             resp.cursor?.let { c ->
                 since = c.since ?: since
                 sinceId = c.since_id ?: sinceId
             }
             if (!resp.has_more) break
+            // Schutz gegen Endlosschleife: has_more=true, aber der Cursor bewegt sich nicht
+            // (Server liefert keinen/denselben Cursor) → sonst identische Anfrage in Endlosschleife.
+            if (since == prevSince && sinceId == prevSinceId) break
+            if (++guard >= MAX_PULL_PAGES) break
         }
 
         db.syncCursorDao().put(
@@ -91,5 +105,10 @@ class SyncEngine(
             }
         }
         ok
+    }
+
+    private companion object {
+        /** Harte Obergrenze an Pull-Seiten pro Buch — Backstop gegen einen fehlerhaften Server. */
+        const val MAX_PULL_PAGES = 10_000
     }
 }

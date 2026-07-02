@@ -19,8 +19,11 @@ import ch.schreibwerkstatt.mobile.data.net.dto.SavePageRequest
 import ch.schreibwerkstatt.mobile.data.net.dto.TreeDto
 import ch.schreibwerkstatt.mobile.data.net.dto.TreePageDto
 import java.util.Locale
+import androidx.room.withTransaction
 import ch.schreibwerkstatt.mobile.data.prefs.SettingsStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.ResponseBody
 import retrofit2.Response
 
@@ -39,6 +42,16 @@ class ContentRepository(
 
     private val sync by lazy { SyncEngine(db, net, settings) }
 
+    /**
+     * Serialisiert alle Server-gerichteten Sync-Operationen (Push-Flush + Delta-Pull)
+     * gegeneinander. Ohne das können Editor-Save, Connectivity-Auto-Flush, manueller
+     * Voll-Sync und der stündliche Worker denselben Pending-Write gleichzeitig flushen
+     * (Doppel-PUT) bzw. ein Pull eine gerade lokal dirty gewordene Seite überschreiben.
+     * Die rein lokale Persistenz eines Saves läuft bewusst NICHT unter diesem Lock,
+     * damit ein Save nie hinter einem laufenden Netzwerk-Pull warten muss.
+     */
+    private val syncMutex = Mutex()
+
     // ── Bücher ───────────────────────────────────────────────────────────────
 
     fun observeBooks(): Flow<List<BookEntity>> = db.bookDao().observeAll()
@@ -46,7 +59,10 @@ class ContentRepository(
     suspend fun refreshBooks(): Result<Unit> = runCatching {
         val books = net.content(baseUrl()).books()
         db.bookDao().upsertAll(books.map { it.toEntity() })
-        db.bookDao().deleteMissing(books.map { it.id })
+        // Leere Antwort NICHT als „alles gelöscht" interpretieren: `deleteMissing(emptyList)`
+        // würde zu `DELETE … WHERE id NOT IN ()` = immer wahr → gesamter Buch-Cache weg.
+        // Ein 200-mit-leerem-Body (Serverfehler/Scope-Problem) darf den Cache nicht leeren.
+        if (books.isNotEmpty()) db.bookDao().deleteMissing(books.map { it.id })
     }
 
     suspend fun tree(bookId: Long): Result<TreeDto> = runCatching {
@@ -229,25 +245,32 @@ class ContentRepository(
         // werden vom Sync-Pull nie überschrieben). Dieser Snapshot geht als
         // expected_updated_at mit, damit der Server einen Fremd-Save als 409 erkennt.
         val baseUpdatedAt = db.pageDao().byId(pageId)?.updatedAt
-        // 1) Lokal persistieren (dirty) + Queue konsolidieren.
-        db.pageDao().updateHtml(pageId, html, HtmlText.toPlain(html), dirty = true)
-        db.pendingWriteDao().deletePendingForPage(pageId)
-        val localId = db.pendingWriteDao().insert(
-            PendingWriteEntity(
-                pageId = pageId,
-                bookId = bookId,
-                html = html,
-                deviceId = deviceId,
-                createdAt = nowMillis(),
-                baseUpdatedAt = baseUpdatedAt,
+        // 1) Lokal persistieren (dirty) + Queue konsolidieren — ATOMAR, damit nach einem
+        //    Prozess-Tod/Cancel nie eine dirty-Seite OHNE zugehörigen Pending-Write
+        //    zurückbleibt (die sonst weder gepusht noch gepullt würde → eingefroren).
+        val localId = db.withTransaction {
+            db.pageDao().updateHtml(pageId, html, HtmlText.toPlain(html), dirty = true)
+            db.pendingWriteDao().deletePendingForPage(pageId)
+            db.pendingWriteDao().insert(
+                PendingWriteEntity(
+                    pageId = pageId,
+                    bookId = bookId,
+                    html = html,
+                    deviceId = deviceId,
+                    createdAt = nowMillis(),
+                    baseUpdatedAt = baseUpdatedAt,
+                )
             )
-        )
-        // 2) Online-Versuch.
-        return flushOne(localId, pageId, bookId, html, deviceId, baseUpdatedAt)
+        }
+        // 2) Online-Versuch (serialisiert gegen andere Flushes/Pulls).
+        return syncMutex.withLock { flushOne(localId, pageId, bookId, html, deviceId, baseUpdatedAt) }
     }
 
-    /** Einzelnen Pending-Write gegen den Server schicken. */
-    suspend fun flushOne(
+    /**
+     * Einzelnen Pending-Write gegen den Server schicken. Lock-freie Kern-Primitive —
+     * der Aufrufer hält bereits [syncMutex] (savePage / flushPending / resolve*).
+     */
+    private suspend fun flushOne(
         localId: Long,
         pageId: Long,
         bookId: Long,
@@ -285,7 +308,20 @@ class ContentRepository(
                 )
                 SaveResult.Locked(l?.locked_by_email, l?.expires_at)
             }
+            resp.code() >= 500 -> {
+                // Transienter Serverfehler (500/502/503/504): pending LASSEN, damit der
+                // nächste flushPending es erneut versucht. Als FAILED zu parken hiesse,
+                // die dirty-Seite friert ein (Pull überspringt dirty, flushPending retryt
+                // nur pending) — bis der Nutzer sie zufällig neu editiert.
+                val e = parseError(resp.errorBody(), ApiErrorDto.serializer())
+                db.pendingWriteDao().setStatus(
+                    localId, PendingWriteEntity.STATUS_PENDING, e?.code ?: "HTTP ${resp.code()}"
+                )
+                SaveResult.Queued
+            }
             else -> {
+                // Nicht-transienter Client-Fehler (4xx ausser 409/423): erneuter Versuch
+                // hilft nicht → als failed parken.
                 val e = parseError(resp.errorBody(), ApiErrorDto.serializer())
                 db.pendingWriteDao().setStatus(
                     localId, PendingWriteEntity.STATUS_FAILED, e?.code ?: "HTTP ${resp.code()}"
@@ -311,11 +347,14 @@ class ContentRepository(
      * Änderung verwerfen). Für v1 die einfache „Server gewinnt"-Variante.
      */
     suspend fun resolveWithServerVersion(pageId: Long, bookId: Long): Result<PageEntity> = runCatching {
-        val dto = net.content(baseUrl()).page(pageId)
-        db.pageDao().applyServerVersion(pageId, dto.html, HtmlText.toPlain(dto.html), dto.updated_at, dto.name)
-        // Konflikt-/Pending-Writes der Seite verwerfen.
-        db.pendingWriteDao().latestForPage(pageId)?.let { db.pendingWriteDao().delete(it.localId) }
-        db.pageDao().byId(pageId)!!
+        syncMutex.withLock {
+            val dto = net.content(baseUrl()).page(pageId)
+            db.pageDao().applyServerVersion(pageId, dto.html, HtmlText.toPlain(dto.html), dto.updated_at, dto.name)
+            // Alle Pending-Writes der Seite verwerfen (auch verwaiste conflict/failed-Zeilen),
+            // sonst maskiert eine liegen gebliebene Zeile den aufgelösten Konflikt.
+            db.pendingWriteDao().deleteAllForPage(pageId)
+            db.pageDao().byId(pageId)!!
+        }
     }
 
     /**
@@ -341,22 +380,28 @@ class ContentRepository(
      * bleibt der Konflikt-Pending-Write bestehen.
      */
     suspend fun resolveWithLocalVersion(pageId: Long, bookId: Long): Result<PageEntity> = runCatching {
-        val pending = db.pendingWriteDao().latestForPage(pageId)
-            ?: error("Kein lokaler Stand für Seite $pageId")
-        val serverUpdatedAt = net.content(baseUrl()).page(pageId).updated_at
-        val result = flushOne(
-            localId = pending.localId,
-            pageId = pageId,
-            bookId = bookId,
-            html = pending.html,
-            deviceId = pending.deviceId,
-            baseUpdatedAt = serverUpdatedAt,
-        )
-        when (result) {
-            is SaveResult.Saved -> result.page
-            is SaveResult.Conflict -> error("Erneuter Konflikt beim Überschreiben")
-            is SaveResult.Locked -> error("Seite gesperrt")
-            SaveResult.Queued -> error("Server nicht erreichbar")
+        syncMutex.withLock {
+            val pending = db.pendingWriteDao().latestForPage(pageId)
+                ?: error("Kein lokaler Stand für Seite $pageId")
+            val serverUpdatedAt = net.content(baseUrl()).page(pageId).updated_at
+            val result = flushOne(
+                localId = pending.localId,
+                pageId = pageId,
+                bookId = bookId,
+                html = pending.html,
+                deviceId = pending.deviceId,
+                baseUpdatedAt = serverUpdatedAt,
+            )
+            when (result) {
+                is SaveResult.Saved -> {
+                    // Evtl. ältere verwaiste Queue-Zeilen derselben Seite mit aufräumen.
+                    db.pendingWriteDao().deleteAllForPage(pageId)
+                    db.pageDao().byId(pageId)!!
+                }
+                is SaveResult.Conflict -> error("Erneuter Konflikt beim Überschreiben")
+                is SaveResult.Locked -> error("Seite gesperrt")
+                SaveResult.Queued -> error("Server nicht erreichbar")
+            }
         }
     }
 
@@ -379,18 +424,21 @@ class ContentRepository(
      * in den lokalen Cache (und verwerfen evtl. Pending-Writes — „Server gewinnt").
      */
     suspend fun restoreRevision(pageId: Long, revId: Long, bookId: Long): Result<PageEntity> = runCatching {
-        val api = net.content(baseUrl())
-        val resp = api.restoreRevision(pageId, revId)
-        if (!resp.isSuccessful) error("restore HTTP ${resp.code()}")
-        val dto = api.page(pageId)
-        db.pageDao().applyServerVersion(pageId, dto.html, HtmlText.toPlain(dto.html), dto.updated_at, dto.name)
-        db.pendingWriteDao().latestForPage(pageId)?.let { db.pendingWriteDao().delete(it.localId) }
-        db.pageDao().byId(pageId)!!
+        syncMutex.withLock {
+            val api = net.content(baseUrl())
+            val resp = api.restoreRevision(pageId, revId)
+            if (!resp.isSuccessful) error("restore HTTP ${resp.code()}")
+            val dto = api.page(pageId)
+            db.pageDao().applyServerVersion(pageId, dto.html, HtmlText.toPlain(dto.html), dto.updated_at, dto.name)
+            db.pendingWriteDao().deleteAllForPage(pageId)
+            db.pageDao().byId(pageId)!!
+        }
     }
 
     // ── Sync (Delegation) ────────────────────────────────────────────────────
 
-    suspend fun syncBook(bookId: Long): Result<Unit> = sync.pullBook(bookId, ::baseUrl)
+    suspend fun syncBook(bookId: Long): Result<Unit> =
+        syncMutex.withLock { sync.pullBook(bookId, ::baseUrl) }
 
     /**
      * Voll-Sync über alle bekannten Bücher (für den periodischen Background-Pull
@@ -410,7 +458,8 @@ class ContentRepository(
         firstError?.let { throw it }
     }
 
-    suspend fun flushPending(): Result<Int> = sync.flushPending(::flushOne)
+    suspend fun flushPending(): Result<Int> =
+        syncMutex.withLock { sync.flushPending(::flushOne) }
 
     fun observePending() = db.pendingWriteDao().observePending()
 
