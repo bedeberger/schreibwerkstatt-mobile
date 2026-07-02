@@ -5,6 +5,8 @@ import ch.schreibwerkstatt.mobile.data.net.dto.ChapterNodeDto
 import ch.schreibwerkstatt.mobile.data.net.dto.ConfigDto
 import ch.schreibwerkstatt.mobile.data.net.dto.CreateChapterRequest
 import ch.schreibwerkstatt.mobile.data.net.dto.CreatePageRequest
+import ch.schreibwerkstatt.mobile.data.net.dto.CreateResearchRequest
+import ch.schreibwerkstatt.mobile.data.net.dto.ResearchItemDto
 import ch.schreibwerkstatt.mobile.data.net.dto.PageDto
 import ch.schreibwerkstatt.mobile.data.net.dto.RestoreResponse
 import ch.schreibwerkstatt.mobile.data.net.dto.RevisionDetailResponse
@@ -95,6 +97,24 @@ data class DevicePingRequest(
     val device_id: String,
     val page_id: Long? = null,
 )
+
+/**
+ * Buchweites Recherche-/Wissensboard (`routes/research.js`, gilt hinter dem
+ * Auth-Guard, Device-Token genügt). Die App nutzt v1 nur Liste + Anlegen.
+ */
+interface ResearchApi {
+    /** Voll-Liste der (nicht-archivierten) Recherche-Items eines Buchs. */
+    @GET("research")
+    suspend fun list(
+        @Query("book_id") bookId: Long,
+        @Query("kind") kind: String? = null,
+        @Query("sort") sort: String = "updated",
+    ): List<ResearchItemDto>
+
+    /** Neues Item anlegen. 200 → [ResearchItemDto] · 400 `EMPTY`/`BOOKID_REQ` · 401 · 403. */
+    @POST("research")
+    suspend fun create(@Body body: CreateResearchRequest): Response<ResearchItemDto>
+}
 
 interface SttApi {
     /**

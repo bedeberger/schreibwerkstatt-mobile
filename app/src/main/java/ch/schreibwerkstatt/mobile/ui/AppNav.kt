@@ -24,6 +24,9 @@ import ch.schreibwerkstatt.mobile.ui.components.UpdateDialog
 import ch.schreibwerkstatt.mobile.ui.editor.EditorScreen
 import ch.schreibwerkstatt.mobile.ui.history.HistoryScreen
 import ch.schreibwerkstatt.mobile.ui.pairing.PairingScreen
+import ch.schreibwerkstatt.mobile.ui.research.ResearchCaptureScreen
+import ch.schreibwerkstatt.mobile.ui.research.ResearchListScreen
+import ch.schreibwerkstatt.mobile.ui.research.SharedResearch
 import ch.schreibwerkstatt.mobile.ui.settings.SettingsScreen
 import ch.schreibwerkstatt.mobile.ui.tree.TreeScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -35,16 +38,25 @@ private object Routes {
     const val EDITOR = "editor/{bookId}/{pageId}?title={title}"
     const val HISTORY = "history/{bookId}/{pageId}?title={title}"
     const val SETTINGS = "settings"
+    const val RESEARCH = "research/{bookId}?title={title}"
+    // bookId=-1 → keine Vorauswahl (Share-Flow, Buch wird im Formular gewählt).
+    const val RESEARCH_CAPTURE = "research_capture?bookId={bookId}"
 
     fun tree(bookId: Long, title: String) = "tree/$bookId?title=${Uri.encode(title)}"
     fun editor(bookId: Long, pageId: Long, title: String) =
         "editor/$bookId/$pageId?title=${Uri.encode(title)}"
     fun history(bookId: Long, pageId: Long, title: String) =
         "history/$bookId/$pageId?title=${Uri.encode(title)}"
+    fun research(bookId: Long, title: String) = "research/$bookId?title=${Uri.encode(title)}"
+    fun researchCapture(bookId: Long = -1L) = "research_capture?bookId=$bookId"
 }
 
 @Composable
-fun AppNav(locator: ServiceLocator) {
+fun AppNav(
+    locator: ServiceLocator,
+    sharedResearch: SharedResearch? = null,
+    onSharedConsumed: () -> Unit = {},
+) {
     val navController = rememberNavController()
     val isPaired by locator.tokenStore.isPaired.collectAsStateWithLifecycle()
 
@@ -62,6 +74,15 @@ fun AppNav(locator: ServiceLocator) {
         } else {
             // Beim Start einmal still nach einem neuen Release prüfen.
             locator.updateManager.checkOnLaunch()
+        }
+    }
+
+    // Geteilter Inhalt (ACTION_SEND) → Capture-Screen. Nur wenn gekoppelt; kommt der
+    // Share vor dem Pairing an, bleibt er im State und wird nachgeholt, sobald
+    // isPaired true wird (Effekt läuft dann erneut).
+    LaunchedEffect(sharedResearch, isPaired) {
+        if (sharedResearch != null && isPaired) {
+            navController.navigate(Routes.researchCapture()) { launchSingleTop = true }
         }
     }
 
@@ -120,6 +141,7 @@ fun AppNav(locator: ServiceLocator) {
                 onOpenHistory = { pageId, pageName ->
                     navController.navigate(Routes.history(bookId, pageId, pageName))
                 },
+                onOpenResearch = { navController.navigate(Routes.research(bookId, title)) },
             )
         }
 
@@ -175,6 +197,47 @@ fun AppNav(locator: ServiceLocator) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onSignedOut = { /* isPaired-LaunchedEffect navigiert automatisch */ },
+            )
+        }
+
+        composable(
+            Routes.RESEARCH,
+            arguments = listOf(
+                navArgument("bookId") { type = NavType.LongType },
+                navArgument("title") { type = NavType.StringType; defaultValue = "" },
+            ),
+        ) { entry ->
+            val bookId = entry.arguments?.getLong("bookId") ?: return@composable
+            val title = entry.arguments?.getString("title").orEmpty()
+            ResearchListScreen(
+                bookId = bookId,
+                bookTitle = title,
+                onBack = { navController.popBackStack() },
+                onAdd = { addBookId -> navController.navigate(Routes.researchCapture(addBookId)) },
+            )
+        }
+
+        composable(
+            Routes.RESEARCH_CAPTURE,
+            arguments = listOf(
+                navArgument("bookId") { type = NavType.LongType; defaultValue = -1L },
+            ),
+        ) { entry ->
+            val preselect = entry.arguments?.getLong("bookId")?.takeIf { it > 0 }
+            // Nur der Share-Flow (ohne Vorauswahl) bekommt die Intent-Vorbelegung.
+            val payload = if (preselect == null) sharedResearch else null
+            ResearchCaptureScreen(
+                shared = payload,
+                preselectBookId = preselect,
+                onDone = {
+                    onSharedConsumed()
+                    if (!navController.popBackStack()) {
+                        // Share-Kaltstart: kein Backstack → auf die Bücher-Liste.
+                        navController.navigate(Routes.BOOKS) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                },
             )
         }
     }

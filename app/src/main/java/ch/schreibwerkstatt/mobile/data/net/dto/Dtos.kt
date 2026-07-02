@@ -173,6 +173,57 @@ data class SyncCursorDto(
     val since_id: Long? = null,
 )
 
+// ── Recherche (buchweites Wissensboard, `routes/research.js`) ─────────────────
+
+/** Eine URL eines Recherche-Items. `url_id` nur in Server-Antworten gesetzt. */
+@Serializable
+data class ResearchUrlDto(
+    val url_id: Long? = null,
+    val url: String,
+    val label: String = "",
+)
+
+/**
+ * Ein Recherche-Schnipsel. `pinned`/`archived` kommen als 0/1-Integer aus SQLite
+ * (nicht als JSON-Boolean) → bewusst `Int`. Bild-/Dokument-Blobs werden hier nur
+ * als `has_image`/`has_doc`-Flags reflektiert; die App lädt/erzeugt sie (noch) nicht.
+ */
+@Serializable
+data class ResearchItemDto(
+    val id: Long,
+    val book_id: Long? = null,
+    val kind: String = "note",
+    val title: String? = null,
+    val body: String? = null,
+    val source: String? = null,
+    val pinned: Int = 0,
+    val archived: Int = 0,
+    val created_at: String? = null,
+    val updated_at: String? = null,
+    val tags: List<String> = emptyList(),
+    val urls: List<ResearchUrlDto> = emptyList(),
+    val has_image: Boolean = false,
+    val has_doc: Boolean = false,
+    val doc_name: String? = null,
+)
+
+/**
+ * Neues Recherche-Item anlegen (`POST research`). `book_id` Pflicht; mindestens
+ * eines von `title`/`body`/http(s)-`urls` muss gesetzt sein (sonst 400 `EMPTY`).
+ * Für einen geteilten Link: `kind="link"`, URL in [urls], geteilter Titel/Text in
+ * [title]/[body]. Antwort = [ResearchItemDto].
+ */
+@Serializable
+data class CreateResearchRequest(
+    val book_id: Long,
+    val kind: String = "link",
+    val title: String? = null,
+    val body: String? = null,
+    val source: String? = null,
+    val urls: List<ResearchUrlDto> = emptyList(),
+    val tags: List<String> = emptyList(),
+)
+
 // ── /config (nur STT-relevanter Teil) ───────────────────────────────────────
 
 @Serializable

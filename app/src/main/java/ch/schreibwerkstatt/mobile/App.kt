@@ -11,6 +11,7 @@ import ch.schreibwerkstatt.mobile.data.net.NetworkClient
 import ch.schreibwerkstatt.mobile.data.prefs.SettingsStore
 import ch.schreibwerkstatt.mobile.data.prefs.TokenStore
 import ch.schreibwerkstatt.mobile.data.repo.ContentRepository
+import ch.schreibwerkstatt.mobile.data.repo.ResearchRepository
 import ch.schreibwerkstatt.mobile.data.repo.SyncCoordinator
 import ch.schreibwerkstatt.mobile.update.UpdateManager
 import kotlinx.coroutines.CoroutineScope
@@ -33,6 +34,7 @@ class ServiceLocator(context: Context) {
     val network: NetworkClient by lazy { NetworkClient(tokenStore, debug = BuildConfig.DEBUG) }
     val db: AppDatabase by lazy { AppDatabase.get(appContext) }
     val repository: ContentRepository by lazy { ContentRepository(db, network, settings) }
+    val researchRepository: ResearchRepository by lazy { ResearchRepository(network, settings) }
     val bundleManager: BundleManager by lazy { BundleManager(appContext, tokenStore) }
     val connectivity: ConnectivityObserver by lazy { ConnectivityObserver(appContext) }
     val syncCoordinator: SyncCoordinator by lazy {

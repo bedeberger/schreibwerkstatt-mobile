@@ -174,6 +174,25 @@
     <string name="editor_listening_hint">Tap to finish</string>
     <string name="editor_transcribing">Transcribing …</string>
 
+    <!-- Research (per-book knowledge board) -->
+    <string name="research_title">Research</string>
+    <string name="research_empty">No research items yet.</string>
+    <string name="research_empty_hint">Share a link from another app here, or tap “+” to capture something.</string>
+    <string name="research_load_error">Couldn’t load research: %1$s</string>
+    <string name="research_add">Add research</string>
+    <string name="research_untitled">(untitled)</string>
+    <!-- Capture form -->
+    <string name="research_capture_title">Capture research</string>
+    <string name="research_book_label">Book</string>
+    <string name="research_book_placeholder">Choose a book</string>
+    <string name="research_url_label">Link</string>
+    <string name="research_title_label">Title</string>
+    <string name="research_note_label">Note</string>
+    <string name="research_save">Save</string>
+    <string name="research_saved">Research saved.</string>
+    <string name="research_save_error">Save failed: %1$s</string>
+    <string name="research_capture_hint">Stored in the chosen book’s research board (online).</string>
+
     <!-- Sync status (offline/queue banner) -->
     <string name="sync_offline">Offline – changes are saved locally</string>
     <plurals name="sync_pending_offline">

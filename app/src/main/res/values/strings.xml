@@ -176,6 +176,25 @@
     <string name="editor_listening_hint">Tippen zum Beenden</string>
     <string name="editor_transcribing">Transkribiere …</string>
 
+    <!-- Recherche (Wissensboard pro Buch) -->
+    <string name="research_title">Recherche</string>
+    <string name="research_empty">Noch keine Recherche-Elemente.</string>
+    <string name="research_empty_hint">Teile einen Link aus einer anderen App hierher oder tippe auf „+", um etwas festzuhalten.</string>
+    <string name="research_load_error">Recherche konnte nicht geladen werden: %1$s</string>
+    <string name="research_add">Recherche hinzufügen</string>
+    <string name="research_untitled">(ohne Titel)</string>
+    <!-- Capture-Formular -->
+    <string name="research_capture_title">Recherche festhalten</string>
+    <string name="research_book_label">Buch</string>
+    <string name="research_book_placeholder">Buch wählen</string>
+    <string name="research_url_label">Link</string>
+    <string name="research_title_label">Titel</string>
+    <string name="research_note_label">Notiz</string>
+    <string name="research_save">Speichern</string>
+    <string name="research_saved">Recherche gespeichert.</string>
+    <string name="research_save_error">Speichern fehlgeschlagen: %1$s</string>
+    <string name="research_capture_hint">Wird im Recherche-Board des gewählten Buchs abgelegt (online).</string>
+
     <!-- Sync-Status (Offline-/Queue-Banner) -->
     <string name="sync_offline">Offline – Änderungen werden lokal gespeichert</string>
     <plurals name="sync_pending_offline">

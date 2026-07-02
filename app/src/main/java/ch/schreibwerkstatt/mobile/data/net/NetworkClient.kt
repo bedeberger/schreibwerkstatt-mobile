@@ -69,6 +69,7 @@ open class NetworkClient(
     open fun content(baseUrl: String): ContentApi = retrofitFor(baseUrl).create(ContentApi::class.java)
     open fun stt(baseUrl: String): SttApi = retrofitFor(baseUrl).create(SttApi::class.java)
     open fun config(baseUrl: String): ConfigApi = retrofitFor(baseUrl).create(ConfigApi::class.java)
+    open fun research(baseUrl: String): ResearchApi = retrofitFor(baseUrl).create(ResearchApi::class.java)
 
     /**
      * Prüft im Pairing ein manuell eingegebenes Device-Token gegen `GET …/config`
