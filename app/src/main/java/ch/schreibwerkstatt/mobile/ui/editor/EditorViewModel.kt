@@ -25,10 +25,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
+/** Grund für einen fehlgeschlagenen Bundle-Load — Text erst in [EditorScreen] aufgelöst. */
+enum class BundleError { NO_SERVER_URL, UNAVAILABLE, FAILED }
+
 sealed interface BundleState {
     data object Loading : BundleState
     data class Ready(val dir: File) : BundleState
-    data class Error(val message: String) : BundleState
+    /** [detail] = dynamischer Exception-Text (nur bei [BundleError.FAILED]), sonst null. */
+    data class Error(val reason: BundleError, val detail: String? = null) : BundleState
 }
 
 /** Nachbarseite (für die Wisch-Navigation vor/zurück). */
@@ -127,20 +131,10 @@ class EditorViewModel(
             }
         }
 
-        viewModelScope.launch {
-            val base = settings.serverBaseUrlOnce()
-            if (base == null) {
-                _state.value = _state.value.copy(bundle = BundleState.Error("Keine Server-URL"))
-                return@launch
-            }
-            // Bundle OTA-sicherstellen.
-            bundleManager.ensureBundle(base)
-                .onSuccess { ok ->
-                    _state.value = if (ok) _state.value.copy(bundle = BundleState.Ready(bundleManager.bundleDir))
-                    else _state.value.copy(bundle = BundleState.Error("Bundle nicht verfügbar"))
-                }
-                .onFailure { _state.value = _state.value.copy(bundle = BundleState.Error(it.message ?: "Bundle-Fehler")) }
+        loadBundle()
 
+        viewModelScope.launch {
+            val base = settings.serverBaseUrlOnce() ?: return@launch
             // STT-Verfügbarkeit prüfen (Mic-Button nur bei stt.enabled).
             runCatching { network.config(base).config().stt?.enabled == true }
                 .onSuccess { _state.value = _state.value.copy(sttEnabled = it) }
@@ -171,6 +165,29 @@ class EditorViewModel(
                 }
             }
         }
+    }
+
+    /** Editor-Bundle laden (OTA-sicherstellen) und den [BundleState] setzen. */
+    private fun loadBundle() {
+        viewModelScope.launch {
+            val base = settings.serverBaseUrlOnce()
+            if (base == null) {
+                _state.value = _state.value.copy(bundle = BundleState.Error(BundleError.NO_SERVER_URL))
+                return@launch
+            }
+            bundleManager.ensureBundle(base)
+                .onSuccess { ok ->
+                    _state.value = if (ok) _state.value.copy(bundle = BundleState.Ready(bundleManager.bundleDir))
+                    else _state.value.copy(bundle = BundleState.Error(BundleError.UNAVAILABLE))
+                }
+                .onFailure { _state.value = _state.value.copy(bundle = BundleState.Error(BundleError.FAILED, it.message)) }
+        }
+    }
+
+    /** Bundle-Load erneut versuchen (Retry-Button im Fehlerzustand). */
+    fun reloadBundle() {
+        _state.value = _state.value.copy(bundle = BundleState.Loading)
+        loadBundle()
     }
 
     fun newBridge(evalJs: (String) -> Unit, darkTheme: Boolean): EditorBridge =

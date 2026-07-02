@@ -41,6 +41,10 @@
     <string name="settings_signout">Dieses Gerät abmelden</string>
     <string name="settings_signout_hint">Abmelden entfernt nur das lokale Token von diesem Gerät. Den Token serverseitig zu widerrufen ist über die Web-Oberfläche möglich.</string>
     <string name="settings_stt_status">Diktat (STT)</string>
+    <string name="settings_stt_loading">…</string>
+    <string name="settings_stt_enabled">aktiviert</string>
+    <string name="settings_stt_disabled">deaktiviert</string>
+    <string name="settings_stt_unknown">unbekannt</string>
     <string name="settings_version">Version</string>
     <string name="settings_check_update">Auf Updates prüfen</string>
     <string name="settings_checking_update">Wird geprüft…</string>
@@ -94,6 +98,8 @@
     <string name="update_permission_message">Damit die App das Update installieren kann, musst du „Aus dieser Quelle installieren" erlauben. Danach erneut auf Installieren tippen.</string>
     <string name="update_permission_open">Einstellungen öffnen</string>
     <string name="update_install">Installieren</string>
+    <string name="update_error_incomplete">Download unvollständig — bitte erneut versuchen.</string>
+    <string name="update_error_signature">Signatur der heruntergeladenen App stimmt nicht überein. Installation abgebrochen.</string>
     <string name="action_close">Schliessen</string>
     <string name="action_retry">Erneut versuchen</string>
 
@@ -135,6 +141,9 @@
     <string name="editor_stop">Stopp</string>
     <string name="editor_bundle_error">Editor konnte nicht geladen werden: %1$s</string>
     <string name="editor_bundle_error_fallback">Bundle-Fehler</string>
+    <string name="editor_bundle_no_server">Keine Server-URL konfiguriert</string>
+    <string name="editor_bundle_unavailable">Editor-Bundle nicht verfügbar</string>
+    <string name="editor_page_fallback_title">Seite</string>
     <string name="editor_conflict_title">Konflikt</string>
     <string name="editor_conflict_message">%1$s hat diese Seite geändert (%2$s). Vergleiche beide Fassungen und wähle, welche bestehen bleibt:</string>
     <string name="editor_conflict_someone">jemand anderem</string>

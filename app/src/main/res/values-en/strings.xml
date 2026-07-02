@@ -39,6 +39,10 @@
     <string name="settings_signout">Sign out this device</string>
     <string name="settings_signout_hint">Signing out only removes the local token from this device. The token can be revoked on the server via the web interface.</string>
     <string name="settings_stt_status">Dictation (STT)</string>
+    <string name="settings_stt_loading">…</string>
+    <string name="settings_stt_enabled">enabled</string>
+    <string name="settings_stt_disabled">disabled</string>
+    <string name="settings_stt_unknown">unknown</string>
     <string name="settings_version">Version</string>
     <string name="settings_check_update">Check for updates</string>
     <string name="settings_checking_update">Checking…</string>
@@ -92,6 +96,8 @@
     <string name="update_permission_message">To let the app install the update, you must allow “Install from this source”. Then tap Install again.</string>
     <string name="update_permission_open">Open settings</string>
     <string name="update_install">Install</string>
+    <string name="update_error_incomplete">Download incomplete — please try again.</string>
+    <string name="update_error_signature">The downloaded app\'s signature does not match. Installation aborted.</string>
     <string name="action_close">Close</string>
     <string name="action_retry">Try again</string>
 
@@ -133,6 +139,9 @@
     <string name="editor_stop">Stop</string>
     <string name="editor_bundle_error">Could not load editor: %1$s</string>
     <string name="editor_bundle_error_fallback">Bundle error</string>
+    <string name="editor_bundle_no_server">No server URL configured</string>
+    <string name="editor_bundle_unavailable">Editor bundle unavailable</string>
+    <string name="editor_page_fallback_title">Page</string>
     <string name="editor_conflict_title">Conflict</string>
     <string name="editor_conflict_message">%1$s changed this page (%2$s). Compare both versions and choose which one stays:</string>
     <string name="editor_conflict_someone">someone else</string>

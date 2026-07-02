@@ -28,7 +28,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.isSystemInDarkTheme
+import ch.schreibwerkstatt.mobile.ui.theme.LocalAppDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,6 +53,7 @@ import androidx.compose.material.icons.filled.HorizontalRule
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SyncProblem
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -103,12 +104,14 @@ import ch.schreibwerkstatt.mobile.R
 import ch.schreibwerkstatt.mobile.editor.EditorBridge
 import ch.schreibwerkstatt.mobile.locator
 import ch.schreibwerkstatt.mobile.ui.components.SkeletonParagraphs
+import ch.schreibwerkstatt.mobile.ui.components.SyncStatusBar
 import ch.schreibwerkstatt.mobile.ui.components.pageFlipGestures
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 private const val APP_ORIGIN = "https://appassets.androidplatform.net"
+private const val APP_ORIGIN_HOST = "appassets.androidplatform.net"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -121,9 +124,12 @@ fun EditorScreen(
     onNavigateToPage: (pageId: Long, pageName: String) -> Unit,
 ) {
     val context = LocalContext.current
-    val darkTheme = isSystemInDarkTheme()
+    val darkTheme = LocalAppDarkTheme.current
     val vm: EditorViewModel = viewModel(factory = EditorViewModel.factory(context.locator, bookId, pageId))
     val state by vm.state.collectAsStateWithLifecycle()
+    val coordinator = remember(context) { context.locator.syncCoordinator }
+    val online by coordinator.online.collectAsStateWithLifecycle()
+    val pendingCount by coordinator.pendingCount.collectAsStateWithLifecycle()
     val snackbarHost = remember { SnackbarHostState() }
     val webViewRef = remember { mutableStateOf<WebView?>(null) }
 
@@ -243,10 +249,14 @@ fun EditorScreen(
             }
         },
     ) { padding ->
+      Column(Modifier.fillMaxSize().padding(padding)) {
+        // Persistenter Offline-/Pending-Streifen — gerade im Editor wichtig, wo sonst
+        // nur eine einmalige „Offline gespeichert"-Snackbar den Zustand andeutet.
+        SyncStatusBar(online = online, pendingCount = pendingCount)
         Box(
             Modifier
-                .fillMaxSize()
-                .padding(padding)
+                .fillMaxWidth()
+                .weight(1f)
                 .pageFlipGestures(
                     // Speichern erledigt der onDispose-Barrier beim Verlassen der Komposition.
                     onPrev = state.prevPage?.let { p ->
@@ -259,8 +269,26 @@ fun EditorScreen(
         ) {
             when (val b = state.bundle) {
                 is BundleState.Loading -> SkeletonParagraphs(Modifier.fillMaxSize())
-                is BundleState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.editor_bundle_error, b.message), color = MaterialTheme.colorScheme.error)
+                is BundleState.Error -> {
+                    val msg = when (b.reason) {
+                        BundleError.NO_SERVER_URL -> stringResource(R.string.editor_bundle_no_server)
+                        BundleError.UNAVAILABLE -> stringResource(R.string.editor_bundle_unavailable)
+                        BundleError.FAILED -> stringResource(
+                            R.string.editor_bundle_error,
+                            b.detail ?: stringResource(R.string.editor_bundle_error_fallback),
+                        )
+                    }
+                    Column(
+                        Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(msg, color = MaterialTheme.colorScheme.error)
+                        Spacer(Modifier.height(12.dp))
+                        Button(onClick = { vm.reloadBundle() }) {
+                            Text(stringResource(R.string.action_retry))
+                        }
+                    }
                 }
                 is BundleState.Ready -> {
                     val bridge = remember(b.dir, darkTheme) { vm.newBridge(evalJs, darkTheme) }
@@ -288,6 +316,7 @@ fun EditorScreen(
                     .padding(bottom = 24.dp, start = 16.dp, end = 16.dp),
             )
         }
+      }
     }
 
     // Konflikt-Dialog (409): beide Fassungen vergleichen, dann bewusst wählen,
@@ -630,6 +659,26 @@ private fun EditorWebView(
                     override fun shouldInterceptRequest(
                         view: WebView, request: WebResourceRequest,
                     ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
+
+                    // Navigation ausserhalb des App-Origins unterbinden. Die SWHost-Bridge
+                    // (loadPage/savePage) bleibt sonst für jede Seite verfügbar, zu der die
+                    // WebView navigiert — nur der eigene appassets-Origin (Bundle/host.html)
+                    // darf sie steuern. Echte http(s)-Links im Inhalt gehen in den
+                    // System-Browser statt in der App-WebView zu öffnen.
+                    override fun shouldOverrideUrlLoading(
+                        view: WebView, request: WebResourceRequest,
+                    ): Boolean {
+                        val url = request.url
+                        if (url.scheme == "https" && url.host == APP_ORIGIN_HOST) return false
+                        if (url.scheme == "https" || url.scheme == "http") {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, url).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                )
+                            }
+                        }
+                        return true // alles Übrige blockieren
+                    }
                 }
                 // Bridge injizieren (Name muss zu host.html passen: SWHost).
                 addJavascriptInterface(bridge, "SWHost")

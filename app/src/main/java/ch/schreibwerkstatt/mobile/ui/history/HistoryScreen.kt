@@ -1,9 +1,12 @@
 package ch.schreibwerkstatt.mobile.ui.history
 
 import android.annotation.SuppressLint
+import android.content.Intent
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import ch.schreibwerkstatt.mobile.ui.theme.LocalAppDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -117,11 +120,19 @@ fun HistoryScreen(
                 state.error != null -> Box(
                     Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        stringResource(R.string.history_load_error, state.error ?: ""),
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center,
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.history_load_error, state.error ?: ""),
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center,
+                        )
+                        Button(onClick = { vm.load() }) {
+                            Text(stringResource(R.string.action_retry))
+                        }
+                    }
                 }
 
                 state.revisions.isEmpty() -> Box(
@@ -251,7 +262,7 @@ private fun RevisionPreviewDialog(
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 private fun RevisionWebView(html: String, modifier: Modifier = Modifier) {
-    val dark = isSystemInDarkTheme()
+    val dark = LocalAppDarkTheme.current
     val bg = if (dark) "#1A1F3A" else "#FAF7F2"
     val fg = if (dark) "#E8E8F0" else "#1A1A1A"
     val doc = """
@@ -272,6 +283,23 @@ private fun RevisionWebView(html: String, modifier: Modifier = Modifier) {
                 settings.allowFileAccess = false
                 settings.allowContentAccess = false
                 setBackgroundColor(if (dark) 0xFF1A1F3A.toInt() else 0xFFFAF7F2.toInt())
+                // Links im Revisions-HTML nicht in dieser read-only-WebView öffnen,
+                // sondern extern (System-Browser); Navigation der WebView selbst blocken.
+                webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(
+                        view: WebView, request: WebResourceRequest,
+                    ): Boolean {
+                        if (request.url.scheme == "https" || request.url.scheme == "http") {
+                            runCatching {
+                                ctx.startActivity(
+                                    Intent(Intent.ACTION_VIEW, request.url)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                )
+                            }
+                        }
+                        return true
+                    }
+                }
             }
         },
         update = { it.loadDataWithBaseURL(null, doc, "text/html", "utf-8", null) },

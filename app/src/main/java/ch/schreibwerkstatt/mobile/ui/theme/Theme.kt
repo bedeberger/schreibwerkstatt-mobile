@@ -8,6 +8,8 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
@@ -68,6 +70,14 @@ private val DarkColors = darkColorScheme(
     onError = Color(0xFF2A0A0A),
 )
 
+/**
+ * Der aktuell aufgelöste Dunkel-/Hell-Zustand der App (aus der Nutzer-Einstellung
+ * `themeMode`, NICHT `isSystemInDarkTheme()`). WebViews (Editor, Revisions-Vorschau)
+ * müssen daraus ihr Theme ableiten, damit sie einer erzwungenen „Hell"/„Dunkel"-
+ * Einstellung folgen statt dem System-Dark-Mode.
+ */
+val LocalAppDarkTheme = staticCompositionLocalOf { false }
+
 @Composable
 fun SchreibwerkstattTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -83,9 +93,11 @@ fun SchreibwerkstattTheme(
         darkTheme -> DarkColors
         else -> LightColors
     }
-    MaterialTheme(
-        colorScheme = colors,
-        typography = AppTypography,
-        content = content,
-    )
+    CompositionLocalProvider(LocalAppDarkTheme provides darkTheme) {
+        MaterialTheme(
+            colorScheme = colors,
+            typography = AppTypography,
+            content = content,
+        )
+    }
 }

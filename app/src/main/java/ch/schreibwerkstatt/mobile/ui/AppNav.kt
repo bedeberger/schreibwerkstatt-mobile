@@ -10,12 +10,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import ch.schreibwerkstatt.mobile.R
 import ch.schreibwerkstatt.mobile.ServiceLocator
 import ch.schreibwerkstatt.mobile.ui.books.BooksScreen
 import ch.schreibwerkstatt.mobile.ui.components.UpdateDialog
@@ -135,7 +137,7 @@ fun AppNav(locator: ServiceLocator) {
             EditorScreen(
                 bookId = bookId,
                 pageId = pageId,
-                pageTitle = title.ifBlank { "Seite" },
+                pageTitle = title.ifBlank { stringResource(R.string.editor_page_fallback_title) },
                 onBack = { navController.popBackStack() },
                 onOpenHistory = { historyPageId, pageName ->
                     navController.navigate(Routes.history(bookId, historyPageId, pageName))

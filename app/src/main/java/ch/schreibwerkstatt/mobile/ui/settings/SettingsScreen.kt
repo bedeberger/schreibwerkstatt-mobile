@@ -156,7 +156,7 @@ fun SettingsScreen(
             HorizontalDivider()
             ListItem(
                 headlineContent = { Text(stringResource(R.string.settings_stt_status)) },
-                supportingContent = { Text(state.sttStatus) },
+                supportingContent = { Text(stringResource(state.sttStatus.label)) },
             )
             HorizontalDivider()
 
@@ -309,7 +309,7 @@ private fun shareDiagnostics(
         appendLine("Gerätename: ${state.deviceName}")
         appendLine("Server: ${state.serverUrl.ifBlank { "—" }}")
         appendLine("Geräte-ID: ${state.deviceId.ifBlank { "—" }}")
-        appendLine("Diktat (STT): ${state.sttStatus}")
+        appendLine("Diktat (STT): ${context.getString(state.sttStatus.label)}")
         appendLine("Status: ${if (online) "online" else "offline"}, $pendingCount ausstehend")
     }
     val send = Intent(Intent.ACTION_SEND).apply {

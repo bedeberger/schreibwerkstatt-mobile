@@ -2,9 +2,13 @@ package ch.schreibwerkstatt.mobile.update
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import ch.schreibwerkstatt.mobile.R
+import java.security.MessageDigest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -90,6 +94,16 @@ class UpdateManager(
         job = scope.launch {
             try {
                 val file = downloadApk(release)
+                // Vor dem Öffnen des Installers: die heruntergeladene APK muss mit
+                // DEMSELBEN Zertifikat signiert sein wie die laufende Installation.
+                // Schützt gegen eine untergeschobene/fremde APK, bevor überhaupt der
+                // System-Installer aufgeht (der würde eine fremd signierte zwar auch
+                // ablehnen, aber erst spät und verwirrend).
+                if (!apkMatchesInstalledSignature(file)) {
+                    file.delete()
+                    _state.value = UpdateState.Error(appContext.getString(R.string.update_error_signature))
+                    return@launch
+                }
                 installOrRequestPermission(file, release)
             } catch (e: Exception) {
                 _state.value = UpdateState.Error(e.message ?: "Download fehlgeschlagen")
@@ -108,10 +122,10 @@ class UpdateManager(
             if (!resp.isSuccessful) error("HTTP ${resp.code}")
             val body = resp.body ?: error("Leere Antwort")
             val total = if (release.apkSizeBytes > 0) release.apkSizeBytes else body.contentLength()
+            var downloaded = 0L
             body.byteStream().use { input ->
                 target.outputStream().use { output ->
                     val buffer = ByteArray(64 * 1024)
-                    var downloaded = 0L
                     while (true) {
                         val read = input.read(buffer)
                         if (read == -1) break
@@ -123,8 +137,56 @@ class UpdateManager(
                     }
                 }
             }
+            // Abgebrochener/unvollständiger Stream: die erwartete Grösse (GitHub-Asset-
+            // Grösse bzw. Content-Length) muss exakt getroffen sein, sonst ist die APK
+            // korrupt — nicht an den Installer weiterreichen.
+            if (total > 0 && downloaded != total) {
+                target.delete()
+                error(appContext.getString(R.string.update_error_incomplete))
+            }
         }
         target
+    }
+
+    /**
+     * True, wenn die APK unter [file] mit demselben Zertifikat signiert ist wie die
+     * aktuell installierte App. Vergleicht die Menge der SHA-256-Fingerprints der
+     * Signaturzertifikate. Fail-closed: fehlt eine Seite (Parsing-Fehler), false.
+     */
+    private fun apkMatchesInstalledSignature(file: File): Boolean {
+        val installed = installedSignatureHashes()
+        val downloaded = apkSignatureHashes(file.absolutePath)
+        return installed.isNotEmpty() && installed == downloaded
+    }
+
+    @Suppress("DEPRECATION", "PackageManagerGetSignatures")
+    private fun installedSignatureHashes(): Set<String> = runCatching {
+        val pm = appContext.packageManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val info = pm.getPackageInfo(appContext.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+            hashSignatures(info.signingInfo?.apkContentsSigners)
+        } else {
+            val info = pm.getPackageInfo(appContext.packageName, PackageManager.GET_SIGNATURES)
+            hashSignatures(info.signatures)
+        }
+    }.getOrDefault(emptySet())
+
+    @Suppress("DEPRECATION", "PackageManagerGetSignatures")
+    private fun apkSignatureHashes(path: String): Set<String> = runCatching {
+        val pm = appContext.packageManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val info = pm.getPackageArchiveInfo(path, PackageManager.GET_SIGNING_CERTIFICATES)
+            hashSignatures(info?.signingInfo?.apkContentsSigners)
+        } else {
+            val info = pm.getPackageArchiveInfo(path, PackageManager.GET_SIGNATURES)
+            hashSignatures(info?.signatures)
+        }
+    }.getOrDefault(emptySet())
+
+    private fun hashSignatures(sigs: Array<android.content.pm.Signature>?): Set<String> {
+        if (sigs.isNullOrEmpty()) return emptySet()
+        val sha = MessageDigest.getInstance("SHA-256")
+        return sigs.map { sha.digest(it.toByteArray()).joinToString("") { b -> "%02x".format(b) } }.toSet()
     }
 
     private fun installOrRequestPermission(file: File, release: ReleaseInfo) {

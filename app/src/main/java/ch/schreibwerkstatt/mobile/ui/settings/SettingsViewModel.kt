@@ -1,10 +1,12 @@
 package ch.schreibwerkstatt.mobile.ui.settings
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import ch.schreibwerkstatt.mobile.R
 import ch.schreibwerkstatt.mobile.ServiceLocator
 import ch.schreibwerkstatt.mobile.data.net.NetworkClient
 import ch.schreibwerkstatt.mobile.data.prefs.SettingsStore
@@ -16,10 +18,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** STT-Verfügbarkeit als lokalisierbarer Zustand (Label erst in der UI aufgelöst). */
+enum class SttStatus(@StringRes val label: Int) {
+    LOADING(R.string.settings_stt_loading),
+    ENABLED(R.string.settings_stt_enabled),
+    DISABLED(R.string.settings_stt_disabled),
+    UNKNOWN(R.string.settings_stt_unknown),
+}
+
 data class SettingsUiState(
     val serverUrl: String = "",
     val deviceName: String = "",
-    val sttStatus: String = "…",
+    val sttStatus: SttStatus = SttStatus.LOADING,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val deviceId: String = "",
     val backgroundSync: Boolean = true,
@@ -40,8 +50,8 @@ class SettingsViewModel(
             _state.update { it.copy(serverUrl = base, deviceId = settings.deviceId()) }
             if (base.isNotBlank()) {
                 val status = runCatching { network.config(base).config().stt?.enabled == true }
-                    .map { if (it) "aktiviert" else "deaktiviert" }
-                    .getOrElse { "unbekannt" }
+                    .map { if (it) SttStatus.ENABLED else SttStatus.DISABLED }
+                    .getOrElse { SttStatus.UNKNOWN }
                 _state.update { it.copy(sttStatus = status) }
             }
         }

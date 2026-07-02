@@ -26,12 +26,15 @@ class BooksViewModel(private val repo: ContentRepository) : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    init { refresh() }
+    // Automatischer Erst-Load: still, damit ein Offline-Kaltstart KEINE Fehler-Snackbar
+    // zeigt, obwohl der Room-Cache (observeBooks) gültige Bücher liefert. Nur ein vom
+    // Nutzer ausgelöster Pull-to-Refresh meldet Fehler sichtbar.
+    init { refresh(silent = true) }
 
-    fun refresh() {
+    fun refresh(silent: Boolean = false) {
         viewModelScope.launch {
             _refreshing.value = true
-            repo.refreshBooks().onFailure { _error.value = it.message }
+            repo.refreshBooks().onFailure { if (!silent) _error.value = it.message }
             _refreshing.value = false
         }
     }
