@@ -183,6 +183,18 @@
     <string name="research_load_error">Recherche konnte nicht geladen werden: %1$s</string>
     <string name="research_add">Recherche hinzufügen</string>
     <string name="research_untitled">(ohne Titel)</string>
+    <!-- Detail-Ansicht (Klick auf ein Element) -->
+    <string name="research_detail_open">Öffnen</string>
+    <string name="research_detail_links">Links</string>
+    <string name="research_detail_note">Notiz</string>
+    <string name="research_detail_tags">Schlagwörter</string>
+    <string name="research_detail_source">Quelle</string>
+    <string name="research_detail_created">Erstellt: %1$s</string>
+    <string name="research_detail_updated">Aktualisiert: %1$s</string>
+    <string name="research_detail_pinned">Angeheftet</string>
+    <string name="research_detail_has_image">Bild angehängt</string>
+    <string name="research_detail_has_doc">Dokument angehängt: %1$s</string>
+    <string name="research_detail_close">Schliessen</string>
     <!-- Capture-Formular -->
     <string name="research_capture_title">Recherche festhalten</string>
     <string name="research_book_label">Buch</string>

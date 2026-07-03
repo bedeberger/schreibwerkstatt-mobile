@@ -181,6 +181,18 @@
     <string name="research_load_error">Couldn’t load research: %1$s</string>
     <string name="research_add">Add research</string>
     <string name="research_untitled">(untitled)</string>
+    <!-- Detail view (tap on an item) -->
+    <string name="research_detail_open">Open</string>
+    <string name="research_detail_links">Links</string>
+    <string name="research_detail_note">Note</string>
+    <string name="research_detail_tags">Tags</string>
+    <string name="research_detail_source">Source</string>
+    <string name="research_detail_created">Created: %1$s</string>
+    <string name="research_detail_updated">Updated: %1$s</string>
+    <string name="research_detail_pinned">Pinned</string>
+    <string name="research_detail_has_image">Image attached</string>
+    <string name="research_detail_has_doc">Document attached: %1$s</string>
+    <string name="research_detail_close">Close</string>
     <!-- Capture form -->
     <string name="research_capture_title">Capture research</string>
     <string name="research_book_label">Book</string>

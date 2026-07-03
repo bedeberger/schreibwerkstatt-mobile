@@ -181,9 +181,11 @@ fun HistoryScreen(
 @Composable
 private fun RevisionRow(rev: RevisionDto, onClick: () -> Unit) {
     val source = sourceLabel(rev.source)
+    val client = rev.client?.takeIf { it.isNotBlank() }
     val author = rev.user_email?.takeIf { it.isNotBlank() }
     val meta = buildString {
         append(source)
+        if (client != null) append(" · ").append(client)
         if (author != null) append(" · ").append(author)
         rev.words?.let { append(" · ").append(stringResource(R.string.history_words, it)) }
     }
@@ -219,11 +221,22 @@ private fun RevisionPreviewDialog(
                     IconButton(onClick = onClose) {
                         Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.action_close))
                     }
-                    Text(
-                        formatRevisionTime(preview.revision.created_at),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.weight(1f),
-                    )
+                    val client = preview.revision.client?.takeIf { it.isNotBlank() }
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            formatRevisionTime(preview.revision.created_at),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        val subtitle = buildString {
+                            append(sourceLabel(preview.revision.source))
+                            if (client != null) append(" · ").append(client)
+                        }
+                        Text(
+                            subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Button(onClick = { confirm = true }, enabled = !restoring && !preview.loadingHtml) {
                         Text(stringResource(R.string.history_restore))
                     }
