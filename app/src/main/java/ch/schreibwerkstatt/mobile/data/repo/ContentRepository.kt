@@ -7,6 +7,7 @@ import ch.schreibwerkstatt.mobile.data.db.PageEntity
 import ch.schreibwerkstatt.mobile.data.db.PendingWriteEntity
 import ch.schreibwerkstatt.mobile.data.net.DevicePingRequest
 import ch.schreibwerkstatt.mobile.data.net.NetworkClient
+import ch.schreibwerkstatt.mobile.data.net.WritingTimeRequest
 import ch.schreibwerkstatt.mobile.data.net.dto.ApiErrorDto
 import ch.schreibwerkstatt.mobile.data.net.dto.BookDto
 import ch.schreibwerkstatt.mobile.data.net.dto.ChapterNodeDto
@@ -466,6 +467,17 @@ class ContentRepository(
     suspend fun devicePing(bookId: Long, pageId: Long?) = runCatching {
         net.content(baseUrl()).devicePing(
             bookId, DevicePingRequest(device_id = settings.deviceId(), page_id = pageId)
+        )
+    }
+
+    /**
+     * Schreibzeit-Heartbeat (best effort): meldet die seit dem letzten Ping
+     * vergangenen Delta-Sekunden. Der Server addiert sie pro (User, Buch, Tag)
+     * auf; die App speichert nichts davon. Fehler/Offline werden geschluckt.
+     */
+    suspend fun writingTime(bookId: Long, seconds: Int) = runCatching {
+        net.content(baseUrl()).writingTime(
+            WritingTimeRequest(book_id = bookId, seconds = seconds)
         )
     }
 

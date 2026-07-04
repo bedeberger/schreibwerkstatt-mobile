@@ -43,6 +43,11 @@ class EditorBridge(
      * auf die Übergabe wartet.
      */
     private val onSaveStarted: () -> Unit,
+    /**
+     * Aktivitäts-Signal aus dem contenteditable (`input`, in host.html debounced).
+     * Setzt die Idle-Uhr des Schreibzeit-Trackers zurück. Läuft auf einem Binder-Thread.
+     */
+    private val onActivity: () -> Unit = {},
     /** Dark-Mode-Wunsch (folgt isSystemInDarkTheme); steuert `data-theme` in der WebView. */
     private val darkTheme: Boolean,
 ) {
@@ -119,6 +124,10 @@ class EditorBridge(
 
     @JavascriptInterface
     fun onReady() = onEvent(EditorEvent.Ready)
+
+    /** Tipp-Aktivität im Editor (debounced) — Idle-Uhr des Schreibzeit-Trackers zurücksetzen. */
+    @JavascriptInterface
+    fun notifyActivity() = onActivity()
 
     @JavascriptInterface
     fun notifyError(msg: String) = onEvent(EditorEvent.Error(msg))

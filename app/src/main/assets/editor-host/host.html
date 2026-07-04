@@ -167,6 +167,20 @@
         async save() { try { await window.__swHandle?.save(); } catch (e) {} },
       };
 
+      // Schreibzeit-Aktivität: jedes `input` (Tippen im contenteditable, auch das
+      // von Diktat/Blockeinfügen dispatchte) meldet — debounced auf 500 ms — dem
+      // nativen Host Aktivität, damit dessen Idle-Uhr nicht auf Leerlauf schaltet.
+      // capture=true auf document, damit der Listener Page-Remounts des Editors
+      // übersteht (er hängt am document, nicht am ausgetauschten .focus-editor).
+      let __actT = 0;
+      document.addEventListener('input', () => {
+        const now = Date.now();
+        if (now - __actT < 500) return;
+        __actT = now;
+        try { window.SWHost && window.SWHost.notifyActivity && window.SWHost.notifyActivity(); }
+        catch (e) {}
+      }, true);
+
       // Checkbox-Toggle: nach dem nativen Klick-Toggle das `checked`-ATTRIBUT
       // spiegeln (nur das landet in innerHTML/Save; die `.checked`-Property tut
       // es nicht). Bubbling-Phase, damit der native Toggle schon angewandt ist.

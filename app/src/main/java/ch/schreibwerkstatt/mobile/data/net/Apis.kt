@@ -70,6 +70,10 @@ interface ContentApi {
         @Body body: DevicePingRequest,
     ): Response<Unit>
 
+    /** Schreibzeit-Heartbeat: Delta-Sekunden pro (User, Buch, Tag) aufaddieren. */
+    @POST("history/writing-time")
+    suspend fun writingTime(@Body body: WritingTimeRequest): Response<Unit>
+
     /** Versionsliste einer Seite (ohne `body_html`, nur Metadaten). */
     @GET("content/pages/{pageId}/revisions")
     suspend fun revisions(
@@ -96,6 +100,12 @@ interface ContentApi {
 data class DevicePingRequest(
     val device_id: String,
     val page_id: Long? = null,
+)
+
+@kotlinx.serialization.Serializable
+data class WritingTimeRequest(
+    val book_id: Long,
+    val seconds: Int,
 )
 
 /**

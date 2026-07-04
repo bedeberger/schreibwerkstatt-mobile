@@ -3,6 +3,7 @@ package ch.schreibwerkstatt.mobile.data.repo
 import ch.schreibwerkstatt.mobile.data.net.ContentApi
 import ch.schreibwerkstatt.mobile.data.net.DevicePingRequest
 import ch.schreibwerkstatt.mobile.data.net.NetworkClient
+import ch.schreibwerkstatt.mobile.data.net.WritingTimeRequest
 import ch.schreibwerkstatt.mobile.data.net.dto.BookDto
 import ch.schreibwerkstatt.mobile.data.net.dto.ChapterNodeDto
 import ch.schreibwerkstatt.mobile.data.net.dto.CreateChapterRequest
@@ -59,6 +60,9 @@ class FakeContentApi : ContentApi {
     }
 
     override suspend fun devicePing(bookId: Long, body: DevicePingRequest): Response<Unit> =
+        Response.success(Unit)
+
+    override suspend fun writingTime(body: WritingTimeRequest): Response<Unit> =
         Response.success(Unit)
 
     override suspend fun createPage(body: CreatePageRequest): Response<PageDto> =

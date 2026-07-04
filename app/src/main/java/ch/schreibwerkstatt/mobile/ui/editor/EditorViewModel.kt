@@ -1,7 +1,10 @@
 package ch.schreibwerkstatt.mobile.ui.editor
 
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -13,6 +16,7 @@ import ch.schreibwerkstatt.mobile.data.prefs.SettingsStore
 import ch.schreibwerkstatt.mobile.data.repo.ContentRepository
 import ch.schreibwerkstatt.mobile.editor.EditorBridge
 import ch.schreibwerkstatt.mobile.editor.EditorEvent
+import ch.schreibwerkstatt.mobile.editor.WritingTimeTracker
 import ch.schreibwerkstatt.mobile.ui.tree.orderedPages
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -107,6 +111,13 @@ class EditorViewModel(
     /** Läuft, solange ein Diktat-Segment auf eine Sprechpause überwacht wird. */
     private var monitorJob: Job? = null
 
+    /**
+     * Idle-gedeckelte Schreibzeit-Uhr. `notifyActivity()` kommt (debounced) aus dem
+     * Editor über die Bridge; `tick()`/`resume()` treibt der vordergrund-gated
+     * Heartbeat unten. Meldet nur positive Delta-Sekunden best effort ans Repository.
+     */
+    private val writingTime = WritingTimeTracker { seconds -> repo.writingTime(bookId, seconds) }
+
     /** Scope für UI-gebundene Bridge-Calls (Laden). */
     val bridgeScope: CoroutineScope get() = viewModelScope
 
@@ -149,6 +160,23 @@ class EditorViewModel(
             while (true) {
                 delay(PING_INTERVAL_MS)
                 repo.devicePing(bookId, pageId)
+            }
+        }
+
+        // Schreibzeit-Heartbeat (Pendant zum Web-Heartbeat): meldet regelmässig die
+        // seit dem letzten Ping *anrechenbare* Zeit (idle-gedeckelt, siehe
+        // [WritingTimeTracker]). Im Gegensatz zum Presence-Ping ist er strikt
+        // vordergrund-gated — `repeatOnLifecycle(RESUMED)` cancelt den Block, sobald
+        // die App in den Hintergrund geht, und startet ihn erst bei Rückkehr wieder.
+        // `resume()` beim (Wieder-)Eintritt in RESUMED beginnt ein frisches Segment,
+        // sodass die Hintergrund-/Abwesenheitslücke nie als Schreibzeit mitzählt.
+        viewModelScope.launch {
+            ProcessLifecycleOwner.get().lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                writingTime.resume()
+                while (true) {
+                    delay(WRITING_TIME_INTERVAL_MS)
+                    writingTime.tick()
+                }
             }
         }
 
@@ -201,6 +229,8 @@ class EditorViewModel(
             onEvent = ::onEditorEvent,
             // Übergabe-Signal (Binder-Thread): gibt einen wartenden Close-Save frei.
             onSaveStarted = { saveHandoff?.complete(Unit) },
+            // Tipp-Aktivität (Binder-Thread) → Idle-Uhr des Schreibzeit-Trackers zurücksetzen.
+            onActivity = { writingTime.notifyActivity() },
             darkTheme = darkTheme,
         )
 
@@ -398,6 +428,9 @@ class EditorViewModel(
     companion object {
         /** Presence-Heartbeat-Intervall. */
         private const val PING_INTERVAL_MS = 30_000L
+
+        /** Schreibzeit-Heartbeat-Intervall (vordergrund-gated). */
+        private const val WRITING_TIME_INTERVAL_MS = 15_000L
 
         /**
          * Obergrenze, wie lange der Close-Pfad auf die Save-Übergabe an die Bridge
