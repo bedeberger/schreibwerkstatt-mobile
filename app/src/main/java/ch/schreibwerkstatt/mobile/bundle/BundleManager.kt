@@ -18,7 +18,8 @@ import java.util.zip.ZipInputStream
  *
  * Layout nach dem Entpacken (alles unter [bundleDir], an Origin-Root gemappt):
  *   js/editor/focus/standalone.js, css/…, icons.svg, bundle-manifest.json
- *   host.html  ← aus den App-Assets hineinkopiert (Einstiegsseite der WebView)
+ *   host.html, editor-host.css  ← aus den App-Assets hineinkopiert
+ *     (Einstiegsseite der WebView + ihre app-eigenen Host-Styles)
  *
  * Der [WebViewAssetLoader] (siehe EditorScreen) serviert [bundleDir] unter
  * https://appassets.androidplatform.net/ — so greift Same-Origin und die
@@ -39,6 +40,7 @@ class BundleManager(
 
     /** Liegt ein entpacktes, lauffähiges Bundle vor? */
     fun isReady(): Boolean = File(bundleDir, "host.html").exists() &&
+        File(bundleDir, "editor-host.css").exists() &&
         File(bundleDir, "js/editor/focus/standalone.js").exists()
 
     /**
@@ -110,20 +112,27 @@ class BundleManager(
         }
     }
 
-    /** Host-Seite aus den App-Assets ins Bundle-Root kopieren. */
+    /** Host-Seite + ihre Styles aus den App-Assets ins Bundle-Root kopieren. */
     private fun copyHostPage() {
-        context.assets.open("editor-host/host.html").use { input ->
-            File(bundleDir, "host.html").outputStream().use { input.copyTo(it) }
+        for (name in HOST_ASSETS) {
+            context.assets.open("editor-host/$name").use { input ->
+                File(bundleDir, name).outputStream().use { input.copyTo(it) }
+            }
         }
     }
 
     /**
-     * host.html best-effort gegen die App-Assets aktualisieren, wenn bereits ein
-     * Bundle-Verzeichnis existiert (304-/Offline-Pfad). Fehler sind nicht-fatal:
-     * die bestehende host.html bleibt dann liegen.
+     * host.html + editor-host.css best-effort gegen die App-Assets aktualisieren,
+     * wenn bereits ein Bundle-Verzeichnis existiert (304-/Offline-Pfad). Fehler
+     * sind nicht-fatal: die bestehenden Dateien bleiben dann liegen.
      */
     private fun refreshHostPage() {
         if (!bundleDir.exists()) return
         runCatching { copyHostPage() }
+    }
+
+    private companion object {
+        /** App-versionierte Host-Assets, die neben das OTA-Bundle kopiert werden. */
+        val HOST_ASSETS = listOf("host.html", "editor-host.css")
     }
 }
