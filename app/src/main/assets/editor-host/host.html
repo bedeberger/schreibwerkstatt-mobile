@@ -35,11 +35,15 @@
        neutralisiert <hr> für Web/Mac und macht es damit unsichtbar — es wird
        NACH diesem <style> injiziert, also hier mit `!important` zurückholen.
        Sichtbare Linie über die volle Schreibbreite, themefähig. */
+       Sichtbarkeit über currentColor (folgt der Textfarbe, kontrastiert also in
+       Hell wie Dunkel), gedimmt — nicht über --color-border, dessen Fallback im
+       Dark-Theme zu schwach war. */
     .focus-editor__content hr {
       border: none !important;
-      border-top: 1px solid var(--color-border, rgba(0, 0, 0, 0.2)) !important;
+      border-top: 1px solid currentColor !important;
+      opacity: 0.28;
       height: 0 !important;
-      margin: 1em 0 !important;
+      margin: 0.4em 0 !important;
     }
     /* Checkbox-Listen (Android-Toolbar `insertChecklist`). Markup:
        <ul class="todo"><li class="todo-item"><input type=checkbox>
@@ -51,11 +55,17 @@
     .focus-editor__content ul.todo {
       list-style: none; padding-left: 0; margin: 0.4em 0;
     }
+       Feste line-height am Item, damit die Checkbox rein über `em` mittig zur
+       ersten Textzeile sitzt — KEIN `lh`-Unit (erst Chromium 109+, ältere
+       WebViews verwerfen die margin-top-Regel sonst und die Checkbox rutscht an
+       den Zeilenanfang nach oben). */
     .focus-editor__content ul.todo > li.todo-item {
-      display: flex; align-items: flex-start; gap: 0.6em; margin: 0.35em 0;
+      display: flex; align-items: flex-start; gap: 0.5em; margin: 0.35em 0;
+      line-height: 1.6;
     }
     .focus-editor__content ul.todo > li.todo-item > input[type="checkbox"] {
-      width: 1.4em; height: 1.4em; margin-top: calc((1lh - 1.4em) / 2);
+      width: 1.25em; height: 1.25em;
+      margin-top: calc((1.6em - 1.25em) / 2);
       accent-color: var(--color-primary, #4b6); cursor: pointer; flex: 0 0 auto;
     }
     .focus-editor__content ul.todo > li.todo-item > .todo-text {
