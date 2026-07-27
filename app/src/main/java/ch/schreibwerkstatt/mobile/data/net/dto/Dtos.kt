@@ -224,11 +224,22 @@ data class CreateResearchRequest(
     val tags: List<String> = emptyList(),
 )
 
-// ── /config (nur STT-relevanter Teil) ───────────────────────────────────────
+// ── /config (nur STT-/LanguageTool-relevanter Teil) ─────────────────────────
 
 @Serializable
 data class ConfigDto(
     val stt: SttConfigDto? = null,
+    val languagetool: LanguageToolConfigDto? = null,
+)
+
+/**
+ * LanguageTool-Verfügbarkeit (`routes/proxies.js`). Der Server exponiert bewusst
+ * nur das Existenz-Flag + die Tipp-Pause — die LT-URL verlässt ihn nie.
+ */
+@Serializable
+data class LanguageToolConfigDto(
+    val enabled: Boolean = false,
+    val debounceMs: Long = 1500,
 )
 
 @Serializable

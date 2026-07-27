@@ -52,6 +52,7 @@
 
     <!-- Settings: Sektionen -->
     <string name="settings_section_appearance">Darstellung</string>
+    <string name="settings_section_editor">Editor</string>
     <string name="settings_section_sync">Synchronisierung</string>
     <string name="settings_section_account">Konto &amp; Gerät</string>
     <string name="settings_section_about">Über die App</string>
@@ -75,6 +76,25 @@
     <string name="settings_sync_running">Synchronisiere…</string>
     <string name="settings_background_sync">Hintergrund-Sync</string>
     <string name="settings_background_sync_hint">Bücher stündlich automatisch im Hintergrund aktualisieren</string>
+
+    <!-- Settings: Rechtschreibprüfung -->
+    <string name="settings_spellcheck">Rechtschreibprüfung</string>
+    <string name="settings_spellcheck_hint">Rechtschreibung, Grammatik und Stil im Editor über LanguageTool prüfen</string>
+    <string name="settings_spellcheck_unavailable">Auf diesem Server nicht aktiviert</string>
+
+    <!-- Editor: Rechtschreib-UI in der WebView (Badge/Popover des Editor-Bundles).
+         Die Schlüssel entsprechen den i18n-Keys des Spellcheck-Controllers;
+         „{n}" wird vom Controller durch die Trefferzahl ersetzt. -->
+    <string name="spellcheck_status_active">LanguageTool aktiv</string>
+    <string name="spellcheck_status_disabled">LanguageTool deaktiviert</string>
+    <string name="spellcheck_status_error">LanguageTool-Fehler</string>
+    <string name="spellcheck_status_matches">{n} Hinweise</string>
+    <string name="spellcheck_status_no_matches">Keine Hinweise</string>
+    <string name="spellcheck_popover_close">Schliessen</string>
+    <string name="spellcheck_popover_no_suggestions">Keine Vorschläge</string>
+    <string name="spellcheck_popover_ignore">Ignorieren</string>
+    <string name="spellcheck_popover_add_to_dict">Zum Wörterbuch</string>
+    <string name="spellcheck_popover_rule_info">Regel-Info</string>
 
     <!-- Settings: Diagnose -->
     <string name="settings_diagnostics">Diagnose-Infos teilen</string>

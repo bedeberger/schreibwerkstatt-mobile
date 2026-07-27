@@ -13,6 +13,7 @@ import ch.schreibwerkstatt.mobile.data.prefs.TokenStore
 import ch.schreibwerkstatt.mobile.data.repo.ContentRepository
 import ch.schreibwerkstatt.mobile.data.repo.ResearchRepository
 import ch.schreibwerkstatt.mobile.data.repo.SyncCoordinator
+import ch.schreibwerkstatt.mobile.editor.SpellcheckClient
 import ch.schreibwerkstatt.mobile.update.UpdateManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +45,8 @@ class ServiceLocator(context: Context) {
 
     fun dictationController(): DictationController =
         DictationController(appContext, network, settings)
+
+    fun spellcheckClient(): SpellcheckClient = SpellcheckClient(network, settings)
 }
 
 class App : Application() {

@@ -8,6 +8,7 @@ import ch.schreibwerkstatt.mobile.data.repo.SaveResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
@@ -50,6 +51,18 @@ class EditorBridge(
     private val onActivity: () -> Unit = {},
     /** Dark-Mode-Wunsch (folgt isSystemInDarkTheme); steuert `data-theme` in der WebView. */
     private val darkTheme: Boolean,
+    /**
+     * Rechtschreibprüfung über den Server-Proxy. null = Feature nicht verdrahtet
+     * (`ltCheck`/`ltAddWord` rejecten dann); das An/Aus steuert host.html über
+     * `window.__sw.setSpellcheck`.
+     */
+    private val spellcheck: SpellcheckClient? = null,
+    /**
+     * Übersetzungen für die Spellcheck-UI im WebView (Badge/Popover). Kommen aus
+     * den `@string/`-Ressourcen, damit auch der WebView-Teil lokalisiert bleibt;
+     * Schlüssel = i18n-Keys des Controllers (`spellcheck.status.*` etc.).
+     */
+    private val spellcheckStrings: Map<String, String> = emptyMap(),
 ) {
     private val json = Json { explicitNulls = false }
 
@@ -117,6 +130,69 @@ class EditorBridge(
             }
         }
     }
+
+    @Serializable
+    private data class LtCheckPayload(val text: String = "", val language: String? = null)
+
+    @Serializable
+    private data class LtAddWordPayload(val word: String = "", val lang: String? = null)
+
+    @Serializable
+    private data class LtAddWordResult(val ok: Boolean)
+
+    /**
+     * Rechtschreibprüfung: Text aus dem Editor → `POST /languagetool/check` (mit
+     * Auth-Header, gegen die echte Server-Basis-URL). Buch/Seite kennt die Bridge
+     * selbst — JS schickt nur den Text, damit die Prüfung nicht an einer fremden
+     * Seiten-ID hängen kann. Aufgelöst wird der rohe JSON-Body der Antwort
+     * (`{ matches: […] }` bzw. `{ disabled: true }`).
+     */
+    @JavascriptInterface
+    fun ltCheck(reqId: String, payloadJson: String) {
+        val client = spellcheck ?: run {
+            evalJs("window.__sw.reject('${reqId.esc()}', 'spellcheck unavailable');")
+            return
+        }
+        scope.launch {
+            val payload = runCatching { json.decodeFromString(LtCheckPayload.serializer(), payloadJson) }.getOrNull()
+            if (payload == null) {
+                evalJs("window.__sw.reject('${reqId.esc()}', 'bad payload');")
+                return@launch
+            }
+            client.check(payload.text, payload.language, bookId, pageId)
+                .onSuccess { body -> evalJs("window.__sw.resolve('${reqId.esc()}', ${jsString(body)});") }
+                .onFailure { e ->
+                    evalJs("window.__sw.reject('${reqId.esc()}', ${jsString(e.message ?: "lt failed")});")
+                }
+        }
+    }
+
+    /** „Zum Wörterbuch" aus dem Spellcheck-Popover → `POST /dictionary`. */
+    @JavascriptInterface
+    fun ltAddWord(reqId: String, payloadJson: String) {
+        val client = spellcheck ?: run {
+            evalJs("window.__sw.reject('${reqId.esc()}', 'spellcheck unavailable');")
+            return
+        }
+        scope.launch {
+            val payload = runCatching { json.decodeFromString(LtAddWordPayload.serializer(), payloadJson) }.getOrNull()
+            if (payload == null || payload.word.isBlank()) {
+                evalJs("window.__sw.reject('${reqId.esc()}', 'bad payload');")
+                return@launch
+            }
+            val ok = client.addWord(payload.word, payload.lang).getOrDefault(false)
+            val out = json.encodeToString(LtAddWordResult.serializer(), LtAddWordResult(ok))
+            evalJs("window.__sw.resolve('${reqId.esc()}', ${jsString(out)});")
+        }
+    }
+
+    /** i18n-Map der Spellcheck-UI (Badge/Popover) als JSON — synchroner Boot-Call. */
+    @JavascriptInterface
+    fun spellcheckStrings(): String =
+        json.encodeToString(
+            MapSerializer(String.serializer(), String.serializer()),
+            spellcheckStrings,
+        )
 
     /** Synchroner Boot-Call aus host.html: setzt `data-theme` ohne Hell-Flash. */
     @JavascriptInterface

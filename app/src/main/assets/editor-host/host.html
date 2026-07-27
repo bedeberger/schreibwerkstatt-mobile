@@ -165,7 +165,73 @@
         },
         setGranularity(g) { try { window.__swHandle?.setGranularity(g); } catch (e) {} },
         async save() { try { await window.__swHandle?.save(); } catch (e) {} },
+        // Rechtschreibprüfung an/aus (nativ gesteuert, siehe EditorScreen).
+        setSpellcheck(on, debounceMs) { setSpellcheck(!!on, debounceMs); },
       };
+
+      // ── Rechtschreibprüfung (LanguageTool) ──────────────────────────────────
+      // Der Spellcheck-Controller liegt im OTA-Bundle, wird hier aber selbst
+      // gemountet (das Bundle mountet nur den Focus-Kern) und bekommt `checkText`/
+      // `addWord` über die native Bridge injiziert: sein Default würde relativ
+      // gegen den Asset-Origin (appassets.androidplatform.net) fetchen — dort gibt
+      // es weder die Route noch den Authorization-Header.
+      const spell = { on: false, debounceMs: 1500, ctl: null, loading: null };
+
+      // Promise-Aufruf einer Bridge-Methode nach dem __sw.track/resolve-Muster.
+      function bridgeCall(method, payload) {
+        if (!window.SWHost || typeof window.SWHost[method] !== 'function') {
+          return Promise.reject(new Error('SWHost.' + method + ' fehlt'));
+        }
+        const id = window.__sw.nextId();
+        const p = window.__sw.track(id);
+        window.SWHost[method](id, JSON.stringify(payload || {}));
+        return p;
+      }
+
+      async function ensureSpellController() {
+        if (spell.ctl) return spell.ctl;
+        if (!spell.loading) spell.loading = (async () => {
+          const root = activeEditor();
+          if (!root) return null;
+          const [ctlMod, applyMod] = await Promise.all([
+            import('./js/cards/editor-spellcheck/controller.js'),
+            import('./js/editor/shared/apply-replacement.js'),
+          ]);
+          let strings = {};
+          try { strings = JSON.parse(window.SWHost.spellcheckStrings() || '{}'); } catch (e) {}
+          return ctlMod.createSpellcheckController({
+            root,
+            // `.focus-editor__content` ist selbst der Scroller (overflow-y:auto aus
+            // focus-mode.css) — wie im Web-Fokusmodus. Der Popover hängt sich dort
+            // als contenteditable="false"-Insel ein und scrollt nativ mit.
+            scrollContainer: root,
+            getHtml: () => root.innerHTML,
+            onApplyReplacement: (range, text) => applyMod.applySpellcheckReplacement(range, text),
+            editorKind: 'focus',
+            // Die App kennt die Buch-Locale nicht; mit `bookId` (setzt die Bridge)
+            // löst der Server sie selbst auf — `language` bleibt darum leer.
+            getBookLocale: () => null,
+            getBookId: () => null,
+            getPageId: () => null,
+            isEnabled: () => spell.on,
+            getDebounceMs: () => spell.debounceMs,
+            i18n: (key) => strings[key] || key,
+            checkText: ({ text }) => bridgeCall('ltCheck', { text }),
+            addWord: ({ word, lang }) => bridgeCall('ltAddWord', { word, lang }).then(r => !!(r && r.ok)),
+          });
+        })().then((ctl) => { spell.ctl = ctl; spell.loading = null; return ctl; })
+             .catch(() => { spell.loading = null; return null; });
+        return spell.loading;
+      }
+
+      async function setSpellcheck(on, debounceMs) {
+        spell.on = on;
+        const ms = Number(debounceMs);
+        if (Number.isFinite(ms) && ms > 0) spell.debounceMs = ms;
+        if (!on) { try { spell.ctl?.detach(); } catch (e) {} return; }
+        const ctl = await ensureSpellController();
+        try { ctl?.attach(); } catch (e) {}
+      }
 
       // Schreibzeit-Aktivität: jedes `input` (Tippen im contenteditable, auch das
       // von Diktat/Blockeinfügen dispatchte) meldet — debounced auf 500 ms — dem

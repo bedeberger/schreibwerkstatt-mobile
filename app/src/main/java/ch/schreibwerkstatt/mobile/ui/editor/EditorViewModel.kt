@@ -16,6 +16,7 @@ import ch.schreibwerkstatt.mobile.data.prefs.SettingsStore
 import ch.schreibwerkstatt.mobile.data.repo.ContentRepository
 import ch.schreibwerkstatt.mobile.editor.EditorBridge
 import ch.schreibwerkstatt.mobile.editor.EditorEvent
+import ch.schreibwerkstatt.mobile.editor.SpellcheckClient
 import ch.schreibwerkstatt.mobile.editor.WritingTimeTracker
 import ch.schreibwerkstatt.mobile.ui.tree.orderedPages
 import kotlinx.coroutines.CompletableDeferred
@@ -66,6 +67,12 @@ sealed interface EditorMsg {
 data class EditorUiState(
     val bundle: BundleState = BundleState.Loading,
     val sttEnabled: Boolean = false,
+    /** Der Editor im WebView ist gemountet (host.html hat `onReady()` gemeldet). */
+    val editorReady: Boolean = false,
+    /** Rechtschreibprüfung aktiv = Server bietet LanguageTool an UND Nutzer will sie. */
+    val spellcheckEnabled: Boolean = false,
+    /** Tipp-Pause vor einer Prüfung (Server-Vorgabe aus `/config`). */
+    val spellcheckDebounceMs: Long = 1500,
     val recording: Boolean = false,
     val transcribing: Boolean = false,
     /** Live-Pegel des Mikrofons (0..1) während der Aufnahme – treibt die Pegel-Anzeige. */
@@ -96,6 +103,7 @@ class EditorViewModel(
     private val network: NetworkClient,
     private val settings: SettingsStore,
     private val dictation: DictationController,
+    private val spellcheck: SpellcheckClient,
     /** App-Scope für den Save-Pfad; überdauert dieses ViewModel (Schliess-Save). */
     private val appScope: CoroutineScope,
     val bookId: Long,
@@ -110,6 +118,16 @@ class EditorViewModel(
 
     /** Läuft, solange ein Diktat-Segment auf eine Sprechpause überwacht wird. */
     private var monitorJob: Job? = null
+
+    /** Server bietet LanguageTool an (`/config`). */
+    @Volatile private var serverSpellcheck = false
+
+    /** Nutzer-Schalter aus den Einstellungen. */
+    @Volatile private var userSpellcheck = true
+
+    private fun syncSpellcheckFlag() {
+        _state.value = _state.value.copy(spellcheckEnabled = serverSpellcheck && userSpellcheck)
+    }
 
     /**
      * Idle-gedeckelte Schreibzeit-Uhr. `notifyActivity()` kommt (debounced) aus dem
@@ -146,12 +164,28 @@ class EditorViewModel(
 
         viewModelScope.launch {
             val base = settings.serverBaseUrlOnce() ?: return@launch
-            // STT-Verfügbarkeit prüfen (Mic-Button nur bei stt.enabled).
-            runCatching { network.config(base).config().stt?.enabled == true }
-                .onSuccess { _state.value = _state.value.copy(sttEnabled = it) }
+            // Server-Features prüfen: Mic-Button nur bei stt.enabled, Rechtschreib-
+            // prüfung nur, wenn der Server den LanguageTool-Proxy anbietet.
+            runCatching { network.config(base).config() }.onSuccess { cfg ->
+                serverSpellcheck = cfg.languagetool?.enabled == true
+                _state.value = _state.value.copy(
+                    sttEnabled = cfg.stt?.enabled == true,
+                    spellcheckDebounceMs = cfg.languagetool?.debounceMs ?: 1500,
+                )
+                syncSpellcheckFlag()
+            }
 
             // Schreibendes Gerät als Buch-Präsenz registrieren (best effort).
             repo.devicePing(bookId, pageId)
+        }
+
+        // Nutzer-Schalter (Einstellungen) live nachziehen — der Editor darf offen
+        // bleiben, während die Prüfung an-/abgeschaltet wird.
+        viewModelScope.launch {
+            settings.spellcheck.collect { on ->
+                userSpellcheck = on
+                syncSpellcheckFlag()
+            }
         }
 
         // Presence-Heartbeat: solange der Editor offen ist, regelmässig pingen,
@@ -218,7 +252,16 @@ class EditorViewModel(
         loadBundle()
     }
 
-    fun newBridge(evalJs: (String) -> Unit, darkTheme: Boolean): EditorBridge =
+    /**
+     * Baut die WebView-Bridge. [spellcheckStrings] kommt aus den `@string/`-
+     * Ressourcen (im Composable aufgelöst) und lokalisiert die Spellcheck-UI,
+     * die im WebView gerendert wird.
+     */
+    fun newBridge(
+        evalJs: (String) -> Unit,
+        darkTheme: Boolean,
+        spellcheckStrings: Map<String, String>,
+    ): EditorBridge =
         EditorBridge(
             repo = repo,
             scope = bridgeScope,
@@ -232,6 +275,8 @@ class EditorViewModel(
             // Tipp-Aktivität (Binder-Thread) → Idle-Uhr des Schreibzeit-Trackers zurücksetzen.
             onActivity = { writingTime.notifyActivity() },
             darkTheme = darkTheme,
+            spellcheck = spellcheck,
+            spellcheckStrings = spellcheckStrings,
         )
 
     /**
@@ -251,7 +296,9 @@ class EditorViewModel(
 
     private fun onEditorEvent(event: EditorEvent) {
         when (event) {
-            is EditorEvent.Ready -> {}
+            // Editor gemountet: erst jetzt greifen JS-Aufrufe von aussen
+            // (z.B. das Ein-/Ausschalten der Rechtschreibprüfung).
+            is EditorEvent.Ready -> _state.value = _state.value.copy(editorReady = true)
             is EditorEvent.SavedOffline -> _state.value = _state.value.copy(message = EditorMsg.SavedOffline)
             is EditorEvent.Conflict -> {
                 lastConflict = event
@@ -461,6 +508,7 @@ class EditorViewModel(
                         network = locator.network,
                         settings = locator.settings,
                         dictation = locator.dictationController(),
+                        spellcheck = locator.spellcheckClient(),
                         appScope = locator.applicationScope,
                         bookId = bookId,
                         pageId = pageId,

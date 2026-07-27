@@ -32,6 +32,7 @@ class SettingsStore(private val context: Context) {
         val DEVICE_ID = stringPreferencesKey("device_id")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val BACKGROUND_SYNC = booleanPreferencesKey("background_sync")
+        val SPELLCHECK = booleanPreferencesKey("spellcheck")
     }
 
     val serverBaseUrl: Flow<String?> =
@@ -54,6 +55,17 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setBackgroundSync(enabled: Boolean) {
         context.dataStore.edit { it[Keys.BACKGROUND_SYNC] = enabled }
+    }
+
+    /**
+     * Rechtschreibprüfung (LanguageTool) im Editor. Default: aktiviert — greift
+     * aber nur, wenn der Server das Feature auch anbietet (`/config`).
+     */
+    val spellcheck: Flow<Boolean> =
+        context.dataStore.data.map { it[Keys.SPELLCHECK] ?: true }
+
+    suspend fun setSpellcheck(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.SPELLCHECK] = enabled }
     }
 
     suspend fun serverBaseUrlOnce(): String? =

@@ -16,6 +16,7 @@ import ch.schreibwerkstatt.mobile.data.net.dto.SyncResponse
 import ch.schreibwerkstatt.mobile.data.net.dto.TranscribeResponse
 import ch.schreibwerkstatt.mobile.data.net.dto.TreeDto
 import okhttp3.RequestBody
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -125,6 +126,44 @@ interface ResearchApi {
     @POST("research")
     suspend fun create(@Body body: CreateResearchRequest): Response<ResearchItemDto>
 }
+
+/**
+ * Rechtschreib-/Grammatikprüfung (`routes/languagetool.js`, `routes/dictionary.js`).
+ * Beide liegen hinter dem Auth-Guard — das Device-Token genügt.
+ *
+ * Die Prüf-Antwort wird bewusst NICHT typisiert: die `matches[]` sind rohe
+ * LanguageTool-Objekte (Regel-Metadaten, Kontext, Ersetzungen), die der
+ * Spellcheck-Controller im WebView unverändert konsumiert. Ein DTO hier wäre
+ * reine Drift-Quelle — der Body geht als JSON-String durch die Bridge.
+ */
+interface LanguageToolApi {
+    /** 200 → `{ matches: [...] }` · 404 `languagetool_disabled` · 408/413/502. */
+    @POST("languagetool/check")
+    suspend fun check(@Body body: LtCheckRequest): Response<ResponseBody>
+
+    /** Wort ins persönliche Wörterbuch (`bookId=0` = alle Bücher). 200 → `{ ok: true }`. */
+    @POST("dictionary")
+    suspend fun addWord(@Body body: DictionaryAddRequest): Response<Unit>
+}
+
+/**
+ * `language` ist nur Fallback: ist `bookId` gesetzt, gewinnt serverseitig die
+ * Buch-Locale. `pageId` aktiviert den Server-Cache (`page_languagetool_cache`).
+ */
+@kotlinx.serialization.Serializable
+data class LtCheckRequest(
+    val text: String,
+    val language: String? = null,
+    val bookId: Long? = null,
+    val pageId: Long? = null,
+)
+
+@kotlinx.serialization.Serializable
+data class DictionaryAddRequest(
+    val word: String,
+    val bookId: Long = 0,
+    val lang: String = "*",
+)
 
 interface SttApi {
     /**

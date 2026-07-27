@@ -34,10 +34,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -136,6 +138,8 @@ fun EditorScreen(
     // evaluateJavascript-Helfer (UI-Thread).
     val evalJs: (String) -> Unit = { js -> webViewRef.value?.post { webViewRef.value?.evaluateJavascript(js, null) } }
 
+    val spellcheckStrings = rememberSpellcheckStrings()
+
     val micDeniedMsg = stringResource(R.string.editor_mic_denied)
     val activity = context as? Activity
     // Dialoge der Mikrofon-Berechtigung (Diktat): Begründung vor erneuter Anfrage,
@@ -168,6 +172,17 @@ fun EditorScreen(
             ) -> showMicRationale = true
             else -> micPermission.launch(Manifest.permission.RECORD_AUDIO)
         }
+    }
+
+    // Rechtschreibprüfung im WebView an-/abschalten. Erst wenn der Editor gemountet
+    // ist (`onReady`), existiert das contenteditable, an das der Controller andockt —
+    // vorher liefe der Aufruf ins Leere.
+    LaunchedEffect(state.editorReady, state.spellcheckEnabled, state.spellcheckDebounceMs) {
+        if (!state.editorReady) return@LaunchedEffect
+        evalJs(
+            "window.__sw && window.__sw.setSpellcheck(" +
+                "${state.spellcheckEnabled}, ${state.spellcheckDebounceMs});"
+        )
     }
 
     // Snackbar-Events: lokalisierbaren Message-Typ hier (Composable-Scope) auflösen.
@@ -249,7 +264,25 @@ fun EditorScreen(
             }
         },
     ) { padding ->
-      Column(Modifier.fillMaxSize().padding(padding)) {
+      // `imePadding()` ist Voraussetzung für den Typewriter-Scroll der WebView:
+      // Die Activity läuft edge-to-edge (`enableEdgeToEdge()` in MainActivity),
+      // damit ist `windowSoftInputMode="adjustResize"` wirkungslos — das Fenster
+      // wird von der Tastatur NICHT mehr verkleinert, sie liefert nur noch Insets.
+      // Ohne diese Zeile behält die WebView volle Höhe, `visualViewport`/`100vh`
+      // im Editor-Bundle melden weiter den ganzen Bildschirm, und die
+      // Schreiblinie (Anker = Mitte des „sichtbaren" Bereichs) landet hinter der
+      // Tastatur → beim Tippen scrollt sichtbar nichts mehr nach. Mit dem
+      // IME-Padding schrumpft die WebView real, das Bundle rechnet wieder mit dem
+      // tatsächlich sichtbaren Ausschnitt. `consumeWindowInsets(padding)`
+      // verhindert doppeltes Padding: die Scaffold-Insets (Navigationsleiste)
+      // stecken bereits im IME-Inset.
+      Column(
+          Modifier
+              .fillMaxSize()
+              .padding(padding)
+              .consumeWindowInsets(padding)
+              .imePadding()
+      ) {
         // Persistenter Offline-/Pending-Streifen — gerade im Editor wichtig, wo sonst
         // nur eine einmalige „Offline gespeichert"-Snackbar den Zustand andeutet.
         SyncStatusBar(online = online, pendingCount = pendingCount)
@@ -291,7 +324,9 @@ fun EditorScreen(
                     }
                 }
                 is BundleState.Ready -> {
-                    val bridge = remember(b.dir, darkTheme) { vm.newBridge(evalJs, darkTheme) }
+                    val bridge = remember(b.dir, darkTheme, spellcheckStrings) {
+                        vm.newBridge(evalJs, darkTheme, spellcheckStrings)
+                    }
                     EditorWebView(
                         bundleDir = b.dir,
                         bridge = bridge,
@@ -429,6 +464,44 @@ fun EditorScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * i18n der Spellcheck-UI, die im WebView gerendert wird (Badge/Popover des
+ * Editor-Bundles). Hier aufgelöst, weil nur der Composable-Scope Zugriff auf die
+ * String-Ressourcen hat; die Bridge reicht die Map als JSON nach JS durch. Die
+ * Schlüssel sind die i18n-Keys des Spellcheck-Controllers. Stabil gehalten
+ * (`remember`), damit die WebView-Bridge nicht bei jeder Recomposition neu entsteht.
+ */
+@Composable
+private fun rememberSpellcheckStrings(): Map<String, String> {
+    val statusActive = stringResource(R.string.spellcheck_status_active)
+    val statusDisabled = stringResource(R.string.spellcheck_status_disabled)
+    val statusError = stringResource(R.string.spellcheck_status_error)
+    val statusMatches = stringResource(R.string.spellcheck_status_matches)
+    val statusNoMatches = stringResource(R.string.spellcheck_status_no_matches)
+    val popoverClose = stringResource(R.string.spellcheck_popover_close)
+    val popoverNoSuggestions = stringResource(R.string.spellcheck_popover_no_suggestions)
+    val popoverIgnore = stringResource(R.string.spellcheck_popover_ignore)
+    val popoverAddToDict = stringResource(R.string.spellcheck_popover_add_to_dict)
+    val popoverRuleInfo = stringResource(R.string.spellcheck_popover_rule_info)
+    return remember(
+        statusActive, statusDisabled, statusError, statusMatches, statusNoMatches,
+        popoverClose, popoverNoSuggestions, popoverIgnore, popoverAddToDict, popoverRuleInfo,
+    ) {
+        mapOf(
+            "spellcheck.status.active" to statusActive,
+            "spellcheck.status.disabled" to statusDisabled,
+            "spellcheck.status.error" to statusError,
+            "spellcheck.status.matches" to statusMatches,
+            "spellcheck.status.no_matches" to statusNoMatches,
+            "spellcheck.popover.close" to popoverClose,
+            "spellcheck.popover.no_suggestions" to popoverNoSuggestions,
+            "spellcheck.popover.ignore" to popoverIgnore,
+            "spellcheck.popover.add_to_dict" to popoverAddToDict,
+            "spellcheck.popover.rule_info" to popoverRuleInfo,
+        )
     }
 }
 

@@ -33,6 +33,10 @@ data class SettingsUiState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val deviceId: String = "",
     val backgroundSync: Boolean = true,
+    /** Nutzer-Wunsch für die Rechtschreibprüfung im Editor. */
+    val spellcheck: Boolean = true,
+    /** Bietet der Server LanguageTool an? null = noch unbekannt/nicht erreichbar. */
+    val spellcheckAvailable: Boolean? = null,
 )
 
 class SettingsViewModel(
@@ -49,11 +53,20 @@ class SettingsViewModel(
             val base = settings.serverBaseUrlOnce().orEmpty()
             _state.update { it.copy(serverUrl = base, deviceId = settings.deviceId()) }
             if (base.isNotBlank()) {
-                val status = runCatching { network.config(base).config().stt?.enabled == true }
-                    .map { if (it) SttStatus.ENABLED else SttStatus.DISABLED }
+                val cfg = runCatching { network.config(base).config() }
+                val status = cfg
+                    .map { if (it.stt?.enabled == true) SttStatus.ENABLED else SttStatus.DISABLED }
                     .getOrElse { SttStatus.UNKNOWN }
-                _state.update { it.copy(sttStatus = status) }
+                _state.update {
+                    it.copy(
+                        sttStatus = status,
+                        spellcheckAvailable = cfg.map { c -> c.languagetool?.enabled == true }.getOrNull(),
+                    )
+                }
             }
+        }
+        viewModelScope.launch {
+            settings.spellcheck.collect { on -> _state.update { it.copy(spellcheck = on) } }
         }
         viewModelScope.launch {
             settings.themeMode.collect { mode -> _state.update { it.copy(themeMode = mode) } }
@@ -69,6 +82,10 @@ class SettingsViewModel(
 
     fun setBackgroundSync(enabled: Boolean) {
         viewModelScope.launch { settings.setBackgroundSync(enabled) }
+    }
+
+    fun setSpellcheck(enabled: Boolean) {
+        viewModelScope.launch { settings.setSpellcheck(enabled) }
     }
 
     /** Lokales Abmelden: nur den Token verwerfen (kein Server-Revoke). */

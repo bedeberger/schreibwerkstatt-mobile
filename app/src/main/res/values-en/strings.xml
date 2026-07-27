@@ -50,6 +50,7 @@
 
     <!-- Settings: sections -->
     <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_editor">Editor</string>
     <string name="settings_section_sync">Synchronisation</string>
     <string name="settings_section_account">Account &amp; device</string>
     <string name="settings_section_about">About the app</string>
@@ -73,6 +74,25 @@
     <string name="settings_sync_running">Syncing…</string>
     <string name="settings_background_sync">Background sync</string>
     <string name="settings_background_sync_hint">Automatically refresh books hourly in the background</string>
+
+    <!-- Settings: spell check -->
+    <string name="settings_spellcheck">Spell check</string>
+    <string name="settings_spellcheck_hint">Check spelling, grammar and style in the editor via LanguageTool</string>
+    <string name="settings_spellcheck_unavailable">Not enabled on this server</string>
+
+    <!-- Editor: spell-check UI inside the WebView (badge/popover of the editor
+         bundle). Keys match the spellcheck controller's i18n keys; "{n}" is
+         replaced by the controller with the number of hits. -->
+    <string name="spellcheck_status_active">LanguageTool active</string>
+    <string name="spellcheck_status_disabled">LanguageTool disabled</string>
+    <string name="spellcheck_status_error">LanguageTool error</string>
+    <string name="spellcheck_status_matches">{n} suggestions</string>
+    <string name="spellcheck_status_no_matches">No suggestions</string>
+    <string name="spellcheck_popover_close">Close</string>
+    <string name="spellcheck_popover_no_suggestions">No suggestions</string>
+    <string name="spellcheck_popover_ignore">Ignore</string>
+    <string name="spellcheck_popover_add_to_dict">Add to dictionary</string>
+    <string name="spellcheck_popover_rule_info">Rule info</string>
 
     <!-- Settings: diagnostics -->
     <string name="settings_diagnostics">Share diagnostic info</string>

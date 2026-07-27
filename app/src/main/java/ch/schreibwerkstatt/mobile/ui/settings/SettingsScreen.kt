@@ -93,6 +93,30 @@ fun SettingsScreen(
             )
             HorizontalDivider()
 
+            // === Editor ===
+            SectionHeader(stringResource(R.string.settings_section_editor))
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_spellcheck)) },
+                supportingContent = {
+                    Text(
+                        stringResource(
+                            if (state.spellcheckAvailable == false) R.string.settings_spellcheck_unavailable
+                            else R.string.settings_spellcheck_hint
+                        )
+                    )
+                },
+                trailingContent = {
+                    Switch(
+                        checked = state.spellcheck,
+                        onCheckedChange = vm::setSpellcheck,
+                        // Bietet der Server LanguageTool nicht an, bleibt der Schalter
+                        // wirkungslos — dann gar nicht erst bedienbar machen.
+                        enabled = state.spellcheckAvailable != false,
+                    )
+                },
+            )
+            HorizontalDivider()
+
             // === Synchronisierung ===
             SectionHeader(stringResource(R.string.settings_section_sync))
             ListItem(
