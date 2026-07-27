@@ -78,8 +78,94 @@
         return { li, span };
       }
 
+      // ── Typewriter-Anker (Schreiblinie) ─────────────────────────────────────
+      // Die Schreiblinie soll optisch in der Mitte des SICHTBAREN Bildschirms
+      // liegen. Über der WebView sitzen aber Statusleiste, TopAppBar und ggf. der
+      // Sync-Streifen, unter ihr bei offener Tastatur nichts — die WebView-Mitte
+      // liegt damit deutlich unter der Bildschirmmitte, die Schreiblinie klebt
+      // an der Tastatur. Diese Chrome-Höhen kennt nur die native Seite; sie
+      // schickt darum den fertigen Anker als Anteil der WebView-Höhe
+      // (`EditorScreen.kt` → `window.__sw.setTypewriterAnchor`).
+      //
+      // Der Anteil steuert zwei Dinge:
+      //  1. `--sw-pad-top`/`--sw-pad-bottom` (editor-host.css): die Puffer, damit
+      //     erste und letzte Zeile die Linie überhaupt erreichen können. Die
+      //     Formel des Bundles rechnet mit `100vh` als Layout-Höhe UND
+      //     `--focus-vh` als Sichthöhe — im Browser fallen die bei offener
+      //     Tastatur auseinander, in dieser Schale nicht (die WebView schrumpft
+      //     real). Hier wird der Puffer darum direkt aus dem Anker gerechnet.
+      //  2. `host.typewriterAnchor`, den die Engine pro Recenter liest.
+      let anchorRatio = 0.5;
+
+      // Sichtbare WebView-Höhe in CSS-Pixeln. Die WebView endet (dank
+      // `imeAnimationTarget`-Padding) an der Tastaturkante, ihr Layout-Viewport
+      // IST also der sichtbare Bereich.
+      function viewportH() {
+        return document.documentElement.clientHeight || window.innerHeight || 0;
+      }
+
+      // Puffer wachsen nur (pro Bildschirmbreite). Ein Puffer GRÖSSER als nötig
+      // ist harmlos: erste/letzte Zeile erreichen die Schreiblinie weiterhin, es
+      // bleibt nur etwas mehr Leerraum am Seitenrand. Ein schrumpfender Puffer
+      // verschiebt dagegen den gesamten Inhalt gegenüber der Scroll-Position —
+      // beim Öffnen der Tastatur (WebView wird kleiner) sichtbar als Sprung des
+      // ganzen Textes. Die Breite als Schlüssel setzt bei Rotation zurück, wo ein
+      // Puffer aus dem Hochformat sonst dauerhaft zu gross bliebe.
+      const pad = { w: -1, top: 0, bottom: 0 };
+
+      function applyAnchorPadding() {
+        const h = viewportH();
+        if (!(h > 0)) return;
+        const w = document.documentElement.clientWidth || 0;
+        if (w !== pad.w) { pad.w = w; pad.top = 0; pad.bottom = 0; }
+        const a = Math.round(h * anchorRatio);
+        pad.top = Math.max(pad.top, a);
+        pad.bottom = Math.max(pad.bottom, h - a);
+        const s = document.documentElement.style;
+        s.setProperty('--sw-pad-top', pad.top + 'px');
+        s.setProperty('--sw-pad-bottom', pad.bottom + 'px');
+      }
+
+      // Anker für die Engine. Sie bezieht den Anteil auf `visualViewport.height`
+      // (`typewriter.js#anchorY`), die Puffer oben hängen an `clientHeight`.
+      // Melden beide dasselbe, ist der Faktor 1; weicht `visualViewport` in der
+      // WebView ab, hält diese Umrechnung die Linie trotzdem exakt auf
+      // `clientHeight * anchorRatio` — Linie und Puffer bleiben konsistent.
+      function engineAnchor() {
+        const h = viewportH();
+        const vv = window.visualViewport;
+        const base = vv && vv.height > 0 ? vv.height : h;
+        if (!(h > 0) || !(base > 0)) return anchorRatio;
+        return Math.min(Math.max((h * anchorRatio) / base, 0.05), 0.95);
+      }
+
+      // Tastatur/Rotation ändern die WebView-Höhe → Puffer nachziehen. Der Anker
+      // selbst ist ein Anteil und bleibt gültig; die native Seite schickt bei
+      // geänderter Chrome-Höhe einen neuen.
+      window.addEventListener('resize', applyAnchorPadding);
+      window.visualViewport && window.visualViewport.addEventListener('resize', applyAnchorPadding);
+
       window.__sw = {
         nextId() { return 'r' + (++seq); },
+        // Anker-Anteil der WebView-Höhe (0–1), von der nativen Seite gesetzt.
+        setTypewriterAnchor(ratio) {
+          const v = Number(ratio);
+          if (Number.isFinite(v) && v > 0.05 && v < 0.95) anchorRatio = v;
+          applyAnchorPadding();
+        },
+        // Nach dem Mount aufgerufen (boot): den Anker am Host verankern. Als
+        // Getter, damit jeder Recenter den aktuellen Stand liest, ohne dass wir
+        // bei jedem Viewport-Tick ein Feld nachschreiben müssten.
+        installAnchor(host) {
+          applyAnchorPadding();
+          if (!host) return;
+          try {
+            Object.defineProperty(host, 'typewriterAnchor', {
+              configurable: true,
+              get: engineAnchor,
+            });
+          } catch (e) { /* nicht-fatal: Host behält den statischen Bridge-Wert */ }
+        },
         track(id) {
           return new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
         },
@@ -342,6 +428,9 @@
           bridge,
         });
         window.__swHandle = handle;
+        // Schreiblinie: Anker-Getter am Host verankern + Puffer setzen, bevor
+        // der erste Recenter läuft.
+        try { window.__sw.installAnchor(handle.host); } catch (e) {}
         try { window.SWHost && window.SWHost.onReady(); } catch (e) {}
       } catch (e) {
         bootError(e && e.stack || e);

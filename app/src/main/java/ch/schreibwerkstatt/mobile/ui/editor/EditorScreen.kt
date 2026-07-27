@@ -32,17 +32,20 @@ import ch.schreibwerkstatt.mobile.ui.theme.LocalAppDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -81,6 +84,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
@@ -94,7 +101,9 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
@@ -115,7 +124,7 @@ import org.json.JSONObject
 private const val APP_ORIGIN = "https://appassets.androidplatform.net"
 private const val APP_ORIGIN_HOST = "appassets.androidplatform.net"
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun EditorScreen(
     bookId: Long,
@@ -139,6 +148,21 @@ fun EditorScreen(
     val evalJs: (String) -> Unit = { js -> webViewRef.value?.post { webViewRef.value?.evaluateJavascript(js, null) } }
 
     val spellcheckStrings = rememberSpellcheckStrings()
+
+    // Schreiblinie („Typewriter") des Editors. Der Anker im Bundle ist ein Anteil
+    // der WebView-Höhe; über der WebView liegen aber Statusleiste, TopAppBar und
+    // ggf. der Sync-Streifen, unter ihr bei offener Tastatur nichts. Ein fixes 0.5
+    // setzt die Schreiblinie darum unter die Bildschirmmitte, dicht an die
+    // Tastatur. Diese Geometrie kennt nur die native Seite — sie rechnet daraus
+    // den Anteil, der die Linie auf die Mitte des SICHTBAREN Bildschirms legt,
+    // und schickt ihn an host.html (`window.__sw.setTypewriterAnchor`).
+    val density = LocalDensity.current
+    val imeTargetPx = WindowInsets.imeAnimationTarget.getBottom(density)
+    var typewriterAnchor by remember { mutableStateOf(0.5f) }
+    LaunchedEffect(state.editorReady, typewriterAnchor) {
+        if (!state.editorReady) return@LaunchedEffect
+        evalJs("window.__sw && window.__sw.setTypewriterAnchor($typewriterAnchor);")
+    }
 
     val micDeniedMsg = stringResource(R.string.editor_mic_denied)
     val activity = context as? Activity
@@ -264,24 +288,31 @@ fun EditorScreen(
             }
         },
     ) { padding ->
-      // `imePadding()` ist Voraussetzung für den Typewriter-Scroll der WebView:
+      // IME-Padding ist Voraussetzung für den Typewriter-Scroll der WebView:
       // Die Activity läuft edge-to-edge (`enableEdgeToEdge()` in MainActivity),
       // damit ist `windowSoftInputMode="adjustResize"` wirkungslos — das Fenster
       // wird von der Tastatur NICHT mehr verkleinert, sie liefert nur noch Insets.
-      // Ohne diese Zeile behält die WebView volle Höhe, `visualViewport`/`100vh`
+      // Ohne dieses Padding behält die WebView volle Höhe, `visualViewport`/`100vh`
       // im Editor-Bundle melden weiter den ganzen Bildschirm, und die
-      // Schreiblinie (Anker = Mitte des „sichtbaren" Bereichs) landet hinter der
-      // Tastatur → beim Tippen scrollt sichtbar nichts mehr nach. Mit dem
-      // IME-Padding schrumpft die WebView real, das Bundle rechnet wieder mit dem
-      // tatsächlich sichtbaren Ausschnitt. `consumeWindowInsets(padding)`
-      // verhindert doppeltes Padding: die Scaffold-Insets (Navigationsleiste)
-      // stecken bereits im IME-Inset.
+      // Schreiblinie landet hinter der Tastatur → beim Tippen scrollt sichtbar
+      // nichts mehr nach. Mit dem Padding schrumpft die WebView real und rechnet
+      // mit dem tatsächlich sichtbaren Ausschnitt.
+      // **`imeAnimationTarget` statt `ime`** (also nicht `imePadding()`): das
+      // laufende Inset animiert die Tastaturhöhe über ~20 Frames hoch. Jeder
+      // Frame ist eine echte WebView-Grössenänderung → Chromium legt das Dokument
+      // neu aus, die vh-abhängigen Puffer der Schreibfläche verschieben den Text
+      // gegenüber der Scroll-Position, und der Editor rechnet seinen Recenter
+      // (100 ms debounced) gegen eine Höhe, die schon wieder veraltet ist —
+      // sichtbar als Flackern beim Öffnen/Schliessen der Tastatur. Das
+      // Animations-ZIEL springt einmal auf den Endwert: genau eine Grössenänderung.
+      // `consumeWindowInsets(padding)` verhindert doppeltes Padding: die
+      // Scaffold-Insets (Navigationsleiste) stecken bereits im IME-Inset.
       Column(
           Modifier
               .fillMaxSize()
               .padding(padding)
               .consumeWindowInsets(padding)
-              .imePadding()
+              .windowInsetsPadding(WindowInsets.imeAnimationTarget)
       ) {
         // Persistenter Offline-/Pending-Streifen — gerade im Editor wichtig, wo sonst
         // nur eine einmalige „Offline gespeichert"-Snackbar den Zustand andeutet.
@@ -290,6 +321,18 @@ fun EditorScreen(
             Modifier
                 .fillMaxWidth()
                 .weight(1f)
+                // Lage der WebView im Fenster → Anker der Schreiblinie (s.o.).
+                // Alles über der WebView (Statusleiste, TopAppBar, Sync-Streifen)
+                // und der sichtbare Rest darunter (Navigationsleiste, ohne die
+                // Tastatur) gehen in die Rechnung ein.
+                .onGloballyPositioned { coords ->
+                    val windowHeight = coords.findRootCoordinates().size.height
+                    val topGap = coords.positionInRoot().y.roundToInt()
+                    val height = coords.size.height
+                    val bottomGap = (windowHeight - topGap - height - imeTargetPx).coerceAtLeast(0)
+                    val next = typewriterAnchorRatio(topGap, height, bottomGap)
+                    if (abs(next - typewriterAnchor) > 0.005f) typewriterAnchor = next
+                }
                 .pageFlipGestures(
                     // Speichern erledigt der onDispose-Barrier beim Verlassen der Komposition.
                     onPrev = state.prevPage?.let { p ->
@@ -503,6 +546,27 @@ private fun rememberSpellcheckStrings(): Map<String, String> {
             "spellcheck.popover.rule_info" to popoverRuleInfo,
         )
     }
+}
+
+/**
+ * Anker der Schreiblinie als Anteil der WebView-Höhe (0–1), so dass die Linie auf
+ * der Mitte des sichtbaren Bildschirms liegt.
+ *
+ * [topGap]/[bottomGap] sind die sichtbaren Flächen über/unter der WebView (oben
+ * Statusleiste + TopAppBar + Sync-Streifen, unten Navigationsleiste; die Tastatur
+ * zählt NICHT mit, sie ist nicht sichtbarer Bildschirm). Einheit ist beliebig,
+ * solange alle drei Werte dieselbe benutzen — das Ergebnis ist ein Verhältnis.
+ *
+ * Mitte des sichtbaren Bereichs = `(topGap + height + bottomGap) / 2`, gemessen ab
+ * Bildschirmoberkante; minus [topGap] ergibt den Abstand ab WebView-Oberkante.
+ * Geklemmt, damit extreme Geometrien (sehr flache WebView neben hoher Chrome) die
+ * Linie nicht an den Rand der Schreibfläche drücken.
+ */
+internal fun typewriterAnchorRatio(topGap: Int, height: Int, bottomGap: Int): Float {
+    if (height <= 0) return 0.5f
+    val visible = topGap + height + bottomGap
+    if (visible <= 0) return 0.5f
+    return ((visible / 2f - topGap) / height).coerceIn(0.25f, 0.6f)
 }
 
 /** Fügt Diktat-Text am Cursor der aktiven Seite ein (host.html: window.__sw.insertText). */
@@ -724,6 +788,12 @@ private fun EditorWebView(
                 // WebView-Hintergrund passend zum Theme, damit beim Laden kein
                 // weisser Blitz vor dem CSS-Inject aufscheint (Navy = Dark-BG).
                 setBackgroundColor(if (darkTheme) 0xFF1A1F3A.toInt() else 0xFFFAF7F2.toInt())
+                // Gescrollt wird ausschliesslich der Editor-Container im Dokument
+                // (`.focus-editor__content`); das Dokument selbst ist auf
+                // Viewport-Höhe fixiert. Der Overscroll-Effekt der WebView kann
+                // hier also nur noch als Glow/Stretch am Rand aufblitzen, wenn der
+                // Typewriter-Scroll gegen den Anschlag fährt — abschalten.
+                overScrollMode = WebView.OVER_SCROLL_NEVER
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 settings.allowFileAccess = false

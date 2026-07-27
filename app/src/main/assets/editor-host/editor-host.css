@@ -31,6 +31,31 @@ html, body, #mount { overflow-x: hidden; max-width: 100%; }
   overflow-wrap: anywhere !important;
   word-break: normal;
 }
+/* Schreiblinie („Typewriter") + Scroll-Ruhe im Editor-Container.
+   `!important`, weil das Bundle-CSS nach dieser Datei injiziert wird.
+
+   1) Puffer oben/unten: setzt host.html aus dem nativen Anker
+      (`--sw-pad-top`/`--sw-pad-bottom`, siehe dort). Die Bundle-Formel
+      (focus-mode.css) rechnet mit `100vh` als Layout- und `--focus-vh` als
+      Sichthöhe; im Browser laufen die bei offener Tastatur auseinander, in
+      dieser Schale nicht — die WebView schrumpft real an die Tastaturkante.
+      Mit der Bundle-Formel bliebe unten zu viel Puffer und die letzte Zeile
+      erreichte die Schreiblinie nie. Fallback-Werte greifen nur, falls das
+      JS-Setup nicht durchläuft.
+   2) `overscroll-behavior: none`: der Typewriter-Scroll fährt regelmässig gegen
+      den Scroll-Anschlag. Mit dem elastischen Overscroll von Android 12+
+      dehnt/schnappt der Text dort sichtbar — als Flackern beim Tippen.
+   3) `font-feature-settings` ohne `dlig`/`calt`: diskretionäre Ligaturen und
+      kontextuelle Alternativen formen einen Textlauf beim Tippen neu, die
+      Lauflänge ändert sich mitten im Wort — auf der schmalen Mobil-Spalte
+      rutscht dadurch sichtbar ein Wort in die nächste Zeile und zurück.
+      `kern`/`liga`/`onum` bleiben (statische bzw. erwartete Textsatz-Features). */
+.focus-editor__content {
+  padding-top: var(--sw-pad-top, 40vh) !important;
+  padding-bottom: var(--sw-pad-bottom, 60vh) !important;
+  overscroll-behavior: none !important;
+  font-feature-settings: "kern" 1, "liga" 1, "onum" 1 !important;
+}
 /* Trennlinie (<hr>, Android-Toolbar `insertHr`). Das Bundle-CSS
    (focus-mode.css `.focus-editor__content hr { border:none; height:0 }`)
    neutralisiert <hr> für Web/Mac und macht es damit unsichtbar — es wird
