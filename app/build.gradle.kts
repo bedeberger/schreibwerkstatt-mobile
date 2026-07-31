@@ -34,6 +34,17 @@ val hasReleaseSigning = keystorePropsFile.exists() &&
     listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
         .all { keystoreProps.getProperty(it)?.isNotBlank() == true }
 
+// Demo-Zugang für den „Demo ausprobieren"-Button im Pairing-Screen (Play-Reviewer).
+// Werte aus demo.properties (gitignored — das Repo ist öffentlich, Token gehört nicht hinein;
+// Vorlage: demo.properties.template). Fehlt die Datei, bleiben die Felder leer und der
+// Button wird ausgeblendet.
+val demoPropsFile = rootProject.file("demo.properties")
+val demoProps = Properties().apply {
+    if (demoPropsFile.exists()) demoPropsFile.inputStream().use { load(it) }
+}
+val demoServerUrl: String = demoProps.getProperty("demoServerUrl").orEmpty().trim()
+val demoDeviceToken: String = demoProps.getProperty("demoDeviceToken").orEmpty().trim()
+
 android {
     namespace = "ch.schreibwerkstatt.mobile"
     compileSdk = 35
@@ -52,6 +63,10 @@ android {
         // releases/latest). Distributionskanal, NICHT die Mutterprojekt-Server-API.
         buildConfigField("String", "UPDATE_GITHUB_OWNER", "\"bedeberger\"")
         buildConfigField("String", "UPDATE_GITHUB_REPO", "\"schreibwerkstatt-mobile\"")
+
+        // Demo-Zugang (leer = kein Demo-Button, siehe PairingViewModel.demoAvailable).
+        buildConfigField("String", "DEMO_SERVER_URL", "\"$demoServerUrl\"")
+        buildConfigField("String", "DEMO_DEVICE_TOKEN", "\"$demoDeviceToken\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

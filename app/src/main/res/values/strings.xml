@@ -24,6 +24,8 @@
     <string name="pairing_login">Koppeln</string>
     <string name="pairing_intro">Server-Adresse eingeben und ein Zugangstoken einfügen. Das Token erstellst du am Server unter „Einstellungen → Geräte" und kopierst es hierher.</string>
     <string name="pairing_busy">Token wird geprüft…</string>
+    <string name="pairing_demo_button">Demo ausprobieren</string>
+    <string name="pairing_demo_hint">Noch kein eigener Server? Koppelt die App mit der öffentlichen Demo-Instanz. Die Inhalte sind für alle sichtbar und werden regelmässig zurückgesetzt.</string>
     <string name="pairing_error_url_scheme">URL muss mit http:// oder https:// beginnen</string>
     <string name="pairing_error_prefix">Token muss mit %1$s beginnen</string>
     <string name="pairing_error_invalid">Token ungültig oder widerrufen.</string>

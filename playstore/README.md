@@ -39,9 +39,20 @@ Mikrofon-/Offline-Cache-Abschnitte für den Android-Client präzisiert.
 Die App ist ein gepairter, self-hosted Client → der Google-Reviewer kommt ohne
 erreichbaren Server + gültiges Geräte-Token an keinen Inhalt. Im Abschnitt
 **„App-Zugriff“** hinterlegen:
-- erreichbare Demo-Server-Adresse (öffentlich, **HTTPS**),
-- ein vorab erzeugtes Test-Geräte-Token (`swd_…`),
+- Demo-Server-Adresse: **`https://demo.schreibwerkstatt.app`**,
+- ein dort vorab erzeugtes Test-Geräte-Token (`swd_…`),
 - Pairing-Anleitung: App öffnen → Server-Adresse + Token eingeben → Koppeln.
+
+**Zugangsdaten** (Demo-Konto, Web-Passwort, Geräte-Token) stehen in
+`playstore/reviewer-access.local.md` — gitignored, weil dieses Repo öffentlich ist.
+Token/Passwort deshalb **nie** in dieser Datei, im Listing oder in Screenshots.
+
+**In der App:** Der Pairing-Screen hat einen Button **„Demo ausprobieren"**, der
+Adresse + Demo-Token selbst einträgt und koppelt — der Reviewer muss nichts abtippen.
+Die Werte kommen beim Build aus `demo.properties` im Repo-Root (gitignored, Vorlage
+`demo.properties.template`); ohne diese Datei fehlt der Button im Build. **Vor jedem
+Release-Build für die Console prüfen, dass `demo.properties` vorhanden und gültig ist.**
+Trotzdem im Console-Formular zusätzlich Adresse + Token hinterlegen (Fallback).
 
 ## Store-Listing — Texte (Entwurf)
 
@@ -66,5 +77,7 @@ erreichbaren Server + gültiges Geräte-Token an keinen Inhalt. Im Abschnitt
 ## Noch offen (nicht in dieser Mappe lösbar)
 1. **Closed Testing zuerst** — persönliche Accounts (nach Nov 2023) brauchen 20 Tester / 14 Tage vor Production.
 2. **Screenshots** aus der echten App.
-3. **Öffentlich erreichbarer Demo-Server (HTTPS)** für Reviewer + Test-Token.
+3. ~~Öffentlich erreichbarer Demo-Server (HTTPS) für Reviewer + Test-Token~~ —
+   erledigt: `https://demo.schreibwerkstatt.app`, Zugangsdaten siehe
+   `reviewer-access.local.md`.
 4. **Datenschutz-URL** live schalten (HTML hosten).

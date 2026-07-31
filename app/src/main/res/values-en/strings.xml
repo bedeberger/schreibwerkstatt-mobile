@@ -22,6 +22,8 @@
     <string name="pairing_login">Pair</string>
     <string name="pairing_intro">Enter the server address and paste an access token. Create the token on the server under “Settings → Devices” and copy it here.</string>
     <string name="pairing_busy">Verifying token…</string>
+    <string name="pairing_demo_button">Try the demo</string>
+    <string name="pairing_demo_hint">No server of your own yet? This pairs the app with the public demo instance. Its contents are visible to everyone and are reset regularly.</string>
     <string name="pairing_error_url_scheme">URL must start with http:// or https://</string>
     <string name="pairing_error_prefix">Token must start with %1$s</string>
     <string name="pairing_error_invalid">Token invalid or revoked.</string>

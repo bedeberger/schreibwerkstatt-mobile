@@ -1,0 +1,6 @@
+# Demo-Zugang für den „Demo ausprobieren"-Button im Pairing-Screen.
+# Kopie als demo.properties anlegen (gitignored — dieses Repo ist öffentlich)
+# und die echten Werte eintragen. Fehlt die Datei oder ist ein Wert leer,
+# blendet der Pairing-Screen den Demo-Button aus.
+demoServerUrl=https://demo.example.org
+demoDeviceToken=swd_…

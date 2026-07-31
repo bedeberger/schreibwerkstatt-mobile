@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import ch.schreibwerkstatt.mobile.BuildConfig
 import ch.schreibwerkstatt.mobile.ServiceLocator
 import ch.schreibwerkstatt.mobile.data.net.NetworkClient
 import ch.schreibwerkstatt.mobile.data.net.VerifyResult
@@ -59,6 +60,28 @@ class PairingViewModel(
                 _state.value = _state.value.copy(serverUrl = url)
             }
         }
+    }
+
+    /**
+     * Ist ein Demo-Zugang einkompiliert (`demo.properties` beim Build vorhanden)?
+     * Nur dann zeigt der [PairingScreen] den Demo-Button.
+     */
+    val demoAvailable: Boolean =
+        BuildConfig.DEMO_SERVER_URL.isNotBlank() && BuildConfig.DEMO_DEVICE_TOKEN.isNotBlank()
+
+    /**
+     * Koppelt gegen die Demo-Instanz: füllt Adresse + Token sichtbar in die Felder
+     * und läuft danach durch denselben [couple]-Pfad wie die manuelle Eingabe
+     * (Verifikation gegen `GET …/config`, Speichern erst bei Erfolg).
+     */
+    fun useDemo(onPaired: () -> Unit) {
+        if (!demoAvailable) return
+        _state.value = _state.value.copy(
+            serverUrl = BuildConfig.DEMO_SERVER_URL,
+            token = BuildConfig.DEMO_DEVICE_TOKEN,
+            error = null,
+        )
+        couple(onPaired)
     }
 
     fun onServerUrlChange(v: String) { _state.value = _state.value.copy(serverUrl = v, error = null) }

@@ -16,3 +16,9 @@ local.properties
 keystore.properties
 /app/build/
 /app/release/
+
+# Reviewer-/Demo-Zugangsdaten (Play Console), nie ins VCS.
+/playstore/*.local.md
+
+# Demo-Zugang (Server + Token) fuer den Demo-Button, nie ins VCS.
+/demo.properties

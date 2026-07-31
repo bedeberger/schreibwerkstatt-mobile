@@ -11,7 +11,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -96,6 +98,20 @@ fun PairingScreen(onPaired: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.pairing_login))
+            }
+            if (vm.demoAvailable) {
+                HorizontalDivider()
+                Text(
+                    stringResource(R.string.pairing_demo_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                OutlinedButton(
+                    onClick = { vm.useDemo(onPaired) },
+                    enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.pairing_demo_button))
+                }
             }
             if (state.busy) {
                 CircularProgressIndicator()
