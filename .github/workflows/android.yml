@@ -30,8 +30,10 @@ jobs:
       - name: Assemble debug APK
         run: ./gradlew assembleDebug --stacktrace
 
+      # Flavor-Dimension `distribution`: `testDebugUnitTest` gibt es nicht mehr.
+      # Die Tests unter app/src/test sind flavor-unabhängig, darum reicht der Github-Flavor.
       - name: Unit tests
-        run: ./gradlew testDebugUnitTest --stacktrace
+        run: ./gradlew testGithubDebugUnitTest --stacktrace
 
       - name: Android Lint
         run: ./gradlew lint --stacktrace

@@ -8,7 +8,7 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/run-unit-tests.sh\"",
             "timeout": 300,
-            "statusMessage": "Unit-Tests (testDebugUnitTest)…"
+            "statusMessage": "Unit-Tests (testGithubDebugUnitTest)…"
           }
         ]
       }
