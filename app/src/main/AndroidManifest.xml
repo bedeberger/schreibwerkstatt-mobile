@@ -6,8 +6,9 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Taktiles Feedback beim Diktat-Start/-Stop. -->
     <uses-permission android:name="android.permission.VIBRATE" />
-    <!-- In-App-Update: heruntergeladene APK über den System-Installer installieren. -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- REQUEST_INSTALL_PACKAGES + der Update-FileProvider stehen bewusst NUR im
+         github-Flavor (src/github/AndroidManifest.xml) — im Play-Build wären sie ein
+         Policy-Verstoss. Siehe CLAUDE.md „Vertriebskanäle". -->
 
     <application
         android:name=".App"
@@ -37,16 +38,5 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
-
-        <!-- Teilt die heruntergeladene Update-APK content-URI-basiert mit dem System-Installer. -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
     </application>
 </manifest>

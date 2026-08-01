@@ -47,12 +47,12 @@ val demoDeviceToken: String = demoProps.getProperty("demoDeviceToken").orEmpty()
 
 android {
     namespace = "ch.schreibwerkstatt.mobile"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "ch.schreibwerkstatt.mobile"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
 
@@ -68,6 +68,20 @@ android {
         buildConfigField("String", "DEMO_SERVER_URL", "\"$demoServerUrl\"")
         buildConfigField("String", "DEMO_DEVICE_TOKEN", "\"$demoDeviceToken\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // Vertriebskanal. `github` = Sideload-APK aus GitHub-Releases mit In-App-Update;
+    // `play` = Google-Play-Build OHNE Selbst-Update (siehe CLAUDE.md „Vertriebskanäle").
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("github") {
+            dimension = "distribution"
+            buildConfigField("boolean", "SELF_UPDATE", "true")
+        }
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("boolean", "SELF_UPDATE", "false")
+        }
     }
 
     signingConfigs {

@@ -60,7 +60,6 @@ fun SettingsScreen(
     val context = LocalContext.current
     val vm: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(context.locator))
     val state by vm.state.collectAsStateWithLifecycle()
-    val updateState by context.locator.updateManager.state.collectAsStateWithLifecycle()
     val online by context.locator.syncCoordinator.online.collectAsStateWithLifecycle()
     val pendingCount by context.locator.syncCoordinator.pendingCount.collectAsStateWithLifecycle()
     val syncing by context.locator.syncCoordinator.syncing.collectAsStateWithLifecycle()
@@ -186,27 +185,16 @@ fun SettingsScreen(
 
             // === Über die App ===
             SectionHeader(stringResource(R.string.settings_section_about))
-            val checking = updateState is UpdateState.Checking
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_version)) },
-                supportingContent = {
-                    Text(
-                        when {
-                            checking -> stringResource(R.string.settings_checking_update)
-                            updateState is UpdateState.UpToDate -> stringResource(R.string.settings_up_to_date)
-                            else -> BuildConfig.VERSION_NAME
-                        }
-                    )
-                },
-                trailingContent = {
-                    OutlinedButton(
-                        onClick = { context.locator.updateManager.checkNow() },
-                        enabled = !checking,
-                    ) {
-                        Text(stringResource(R.string.settings_check_update))
-                    }
-                },
-            )
+            // Der Play-Build aktualisiert sich über Play, nicht über GitHub — dort bleibt
+            // nur die Versionsanzeige (siehe CLAUDE.md „Vertriebskanäle").
+            if (BuildConfig.SELF_UPDATE) {
+                VersionWithUpdateCheckItem()
+            } else {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_version)) },
+                    supportingContent = { Text(BuildConfig.VERSION_NAME) },
+                )
+            }
             HorizontalDivider()
             ListItem(
                 headlineContent = { Text(stringResource(R.string.settings_diagnostics)) },
@@ -269,6 +257,37 @@ fun SettingsScreen(
             },
         )
     }
+}
+
+/**
+ * Versionszeile mit „Nach Update suchen"-Button. Nur aus dem github-Flavor erreichbar —
+ * hält den [UpdateManager] aus dem Play-Build heraus (R8 schneidet den Zweig weg).
+ */
+@Composable
+private fun VersionWithUpdateCheckItem() {
+    val context = LocalContext.current
+    val updateState by context.locator.updateManager.state.collectAsStateWithLifecycle()
+    val checking = updateState is UpdateState.Checking
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.settings_version)) },
+        supportingContent = {
+            Text(
+                when {
+                    checking -> stringResource(R.string.settings_checking_update)
+                    updateState is UpdateState.UpToDate -> stringResource(R.string.settings_up_to_date)
+                    else -> BuildConfig.VERSION_NAME
+                }
+            )
+        },
+        trailingContent = {
+            OutlinedButton(
+                onClick = { context.locator.updateManager.checkNow() },
+                enabled = !checking,
+            ) {
+                Text(stringResource(R.string.settings_check_update))
+            }
+        },
+    )
 }
 
 @Composable

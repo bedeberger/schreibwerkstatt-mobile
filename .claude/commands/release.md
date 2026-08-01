@@ -10,10 +10,10 @@ Schritte:
 
 1. **Stand prüfen:** `git status` + `git diff --stat` ansehen, damit der Commit-Message-Text die Änderungen korrekt beschreibt. Aktuelle Version aus [version.properties](version.properties) lesen.
 2. **Bumpen:** In [version.properties](version.properties) `versionName` nach SemVer anheben (Höhe s.o.) **und** `versionCode` um genau 1 erhöhen. Beide Felder gemeinsam. Nie in `build.gradle.kts` hartcodieren.
-3. **Debug-Build verifizieren:** `./gradlew assembleDebug` muss BUILD SUCCESSFUL liefern. Bei Fehler: stoppen und fixen, nicht weitermachen.
+3. **Debug-Build verifizieren:** `./gradlew assembleDebug` (baut beide Flavors) muss BUILD SUCCESSFUL liefern. Bei Fehler: stoppen und fixen, nicht weitermachen.
 4. **Committen:** Alle Änderungen `git add -A`, Commit mit aussagekräftiger Message (Features in Stichpunkten + `Release <versionName> (versionCode <n>)`). Co-Authored-By-Trailer wie üblich.
 5. **Taggen + pushen:** `git tag v<versionName>`, dann `git push origin main` **und** `git push origin v<versionName>`.
-6. **Signierten Release-APK bauen:** `./gradlew assembleRelease` (nutzt `keystore.properties`, ~2.5 MB minifiziert). Ergebnis: `app/build/outputs/apk/release/app-release.apk`.
+6. **Signierten Release-APK bauen:** `./gradlew assembleGithubRelease` (nutzt `keystore.properties`, ~2.5 MB minifiziert). Ergebnis: `app/build/outputs/apk/github/release/app-github-release.apk`. **Zwingend der `github`-Flavor** — nur der hat das In-App-Update; der `play`-Flavor geht nie auf GitHub (siehe CLAUDE.md „Vertriebskanäle").
 7. **GitHub-Release anlegen:** APK in den Scratchpad als `schreibwerkstatt-mobile-v<versionName>.apk` kopieren, dann
    `gh release create v<versionName> --title "v<versionName>" --notes "<Release-Notes aus den Änderungen>" <pfad-zur-umbenannten-apk>`.
 

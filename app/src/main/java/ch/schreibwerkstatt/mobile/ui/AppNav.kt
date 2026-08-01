@@ -17,6 +17,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import ch.schreibwerkstatt.mobile.BuildConfig
 import ch.schreibwerkstatt.mobile.R
 import ch.schreibwerkstatt.mobile.ServiceLocator
 import ch.schreibwerkstatt.mobile.ui.books.BooksScreen
@@ -62,8 +63,6 @@ fun AppNav(
 
     val start = if (isPaired) Routes.BOOKS else Routes.PAIRING
 
-    val updateState by locator.updateManager.state.collectAsStateWithLifecycle()
-
     // Token-Verlust (401 / Abmelden) → zurück zum Pairing, Backstack leeren.
     LaunchedEffect(isPaired) {
         if (!isPaired) {
@@ -71,8 +70,8 @@ fun AppNav(
                 popUpTo(0) { inclusive = true }
                 launchSingleTop = true
             }
-        } else {
-            // Beim Start einmal still nach einem neuen Release prüfen.
+        } else if (BuildConfig.SELF_UPDATE) {
+            // Beim Start einmal still nach einem neuen Release prüfen (nur github-Flavor).
             locator.updateManager.checkOnLaunch()
         }
     }
@@ -243,6 +242,17 @@ fun AppNav(
     }
 
     // Update-Dialog über allen Screens (Auto-Check beim Start + manueller Check in Settings).
+    // Nur im github-Flavor; im Play-Build ist SELF_UPDATE eine Compile-Zeit-Konstante `false`,
+    // sodass R8 den gesamten Update-Pfad aus dem Artefakt wirft.
+    if (BuildConfig.SELF_UPDATE) {
+        UpdateHost(locator)
+    }
+}
+
+/** Sammelt den Update-State und zeigt den Dialog. Nur aus dem github-Flavor erreichbar. */
+@Composable
+private fun UpdateHost(locator: ServiceLocator) {
+    val updateState by locator.updateManager.state.collectAsStateWithLifecycle()
     UpdateDialog(
         state = updateState,
         onDownload = {

@@ -7,14 +7,18 @@ Native **Android-Client** (Kotlin/Jetpack Compose) zur Web-App **schreibwerkstat
 ## Build & Test
 
 ```
-./gradlew assembleDebug      # Debug-APK bauen (Standard-Test nach jeder Änderung)
-./gradlew :app:compileDebugKotlin   # schneller reiner Compile-Check
-./gradlew testDebugUnitTest   # JVM-Unit-Tests (Robolectric/JUnit)
-./gradlew lint                # Android-Lint
+./gradlew assembleDebug              # beide Flavors bauen (Standard-Test nach jeder Änderung)
+./gradlew :app:compileGithubDebugKotlin   # schneller reiner Compile-Check
+./gradlew testGithubDebugUnitTest    # JVM-Unit-Tests (Robolectric/JUnit)
+./gradlew lint                       # Android-Lint
 ```
 
+Die App hat zwei Flavors (Dimension `distribution`, siehe „Vertriebskanäle"), also heissen
+alle variantenspezifischen Tasks `…Github…`/`…Play…`. `assembleDebug` bleibt der
+Sammel-Task und deckt beide ab.
+
 - **Pflicht: Nach jeder Code-Änderung `./gradlew assembleDebug` ausführen** und den Erfolg verifizieren, bevor die Änderung als fertig gilt. Schlägt der Build fehl, zuerst fixen.
-- **Tests:** JVM-Unit-Tests in [app/src/test/](app/src/test/java/ch/schreibwerkstatt/mobile) sichern bewusst die **Harten Regeln** ab (Auth-Header auf jedem Request, `SaveResult`-Pfade, Delta-Pull überschreibt nie dirty, Pending-Queue, STT-Grösse, URL-/Client-Version-Normalisierung) — kein UI-/Compose-Test. **Nach Änderungen unter `data/` `./gradlew testDebugUnitTest` ausführen.** Ein `Stop`-Hook ([.claude/hooks/run-unit-tests.sh](.claude/hooks/run-unit-tests.sh)) tut das am Turn-Ende automatisch, sobald `.kt`-Dateien geändert wurden, und blockiert bei rotem Lauf.
+- **Tests:** JVM-Unit-Tests in [app/src/test/](app/src/test/java/ch/schreibwerkstatt/mobile) sichern bewusst die **Harten Regeln** ab (Auth-Header auf jedem Request, `SaveResult`-Pfade, Delta-Pull überschreibt nie dirty, Pending-Queue, STT-Grösse, URL-/Client-Version-Normalisierung) — kein UI-/Compose-Test. **Nach Änderungen unter `data/` `./gradlew testGithubDebugUnitTest` ausführen.** Ein `Stop`-Hook ([.claude/hooks/run-unit-tests.sh](.claude/hooks/run-unit-tests.sh)) tut das am Turn-Ende automatisch, sobald `.kt`-Dateien geändert wurden, und blockiert bei rotem Lauf.
 - **Toolchain:** Compile-Target ist **JDK 17** (`compileOptions`/`kotlinOptions`). Gradle 8.11.1 selbst läuft nur auf **JDK 17–23** — ein installiertes JDK 24+ als `JAVA_HOME` lässt den Wrapper scheitern. Bei Bedarf `JAVA_HOME` auf ein JDK 17/21 zeigen (z.B. das von Android Studio gebündelte JBR).
 - Android SDK aus `local.properties` (`sdk.dir`); nicht ins VCS committen.
 
@@ -43,6 +47,8 @@ Native **Android-Client** (Kotlin/Jetpack Compose) zur Web-App **schreibwerkstat
 - **Pairing = manuelle Token-Eingabe (wie der Mac-Client).** `PairingScreen` ist ein reines Formular: Server-Adresse + ein am Server (Web-UI „Einstellungen → Geräte", `/me/device-tokens`) **vorab erzeugtes** Device-Token (`swd_…`). `PairingViewModel.couple()` verifiziert das Token über `NetworkClient.verifyToken()` (`GET …/config`, liegt hinter dem Auth-Guard) und legt es **erst bei Erfolg** im `TokenStore` ab — kein WebView/OIDC-Flow, keine `POST /me/device-tokens`-Ausstellung aus der App. **Why:** Google-OIDC im WebView ist unzuverlässig (`disallowed_useragent`); die manuelle Eingabe entkoppelt das Pairing vom Login-Flow.
 
 - **Demo-Zugang kommt aus `demo.properties`, nie aus dem Quellcode.** Der „Demo ausprobieren"-Button im `PairingScreen` füllt Server-Adresse + Demo-Token und läuft danach durch denselben `couple()`-Pfad. Die Werte liest [app/build.gradle.kts](app/build.gradle.kts) aus `demo.properties` im Root (**gitignored**, Vorlage `demo.properties.template`) in `BuildConfig.DEMO_SERVER_URL`/`DEMO_DEVICE_TOKEN`; fehlt die Datei, sind die Felder leer, `PairingViewModel.demoAvailable` ist `false` und der Button verschwindet. **Why:** Das GitHub-Repo ist öffentlich — ein Device-Token darf nicht in getrackte Dateien. Es steckt trotzdem im ausgelieferten APK und ist extrahierbar: das Demo-Konto also als wegwerfbar behandeln (regelmässig zurücksetzen, Token bei Bedarf am Server widerrufen).
+
+- **Vertriebskanäle: zwei Flavors, und der Play-Build aktualisiert sich nie selbst.** Dimension `distribution` in [app/build.gradle.kts](app/build.gradle.kts): `github` (Sideload-APK aus GitHub-Releases, `BuildConfig.SELF_UPDATE = true`) und `play` (Google Play, `SELF_UPDATE = false`). Im `play`-Build fehlen `REQUEST_INSTALL_PACKAGES` und der Update-`FileProvider` **im Manifest** — beide stehen nur in [app/src/github/AndroidManifest.xml](app/src/github/AndroidManifest.xml), nicht im `main`-Manifest. Alle Aufrufer von `updateManager` (`AppNav`, `SettingsScreen`) hängen hinter `if (BuildConfig.SELF_UPDATE)`, damit R8 den ganzen Pfad aus dem Play-Artefakt wirft; **keine neue `updateManager`-Referenz ohne diesen Guard**. **Why:** Googles „Device and Network Abuse" verbietet Apps, die sich ausserhalb von Play aktualisieren — mit Permission oder Installer-Intent im AAB ist die Einreichung ein sicherer Reject. Der GitHub-Kanal bleibt davon unberührt.
 
 - **`device_id` ≠ Auth-Token.** Die stabile Installations-UUID (`SettingsStore.deviceId()`) dient nur Konflikt-/Presence-Zuordnung (`PUT …/pages/:id { device_id }`, `device-ping`) und liegt bewusst getrennt vom geheimen Token.
 

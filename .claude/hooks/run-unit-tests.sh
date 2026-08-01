@@ -13,13 +13,13 @@ printf '%s' "$input" | jq -e '.stop_hook_active == true' >/dev/null 2>&1 && exit
 # Nur aktiv werden, wenn .kt-Dateien geändert sind (tracked, staged oder untracked).
 git status --porcelain 2>/dev/null | grep -qE '\.kt$' || exit 0
 
-out=$(./gradlew testDebugUnitTest -q 2>&1)
+out=$(./gradlew testGithubDebugUnitTest -q 2>&1)
 code=$?
 
 if [ "$code" -eq 0 ]; then
-  jq -nc '{systemMessage:"✓ testDebugUnitTest grün"}'
+  jq -nc '{systemMessage:"✓ testGithubDebugUnitTest grün"}'
 else
   printf '%s' "$out" | tail -40 | jq -Rsc \
-    '{decision:"block", reason:("testDebugUnitTest FAILED — vor dem Beenden fixen:\n" + .)}'
+    '{decision:"block", reason:("testGithubDebugUnitTest FAILED — vor dem Beenden fixen:\n" + .)}'
 fi
 exit 0
